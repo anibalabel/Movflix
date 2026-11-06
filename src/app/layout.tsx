@@ -28,7 +28,7 @@ export default function RootLayout({
               <span className="font-bold text-zinc-300">DOOPLEX</span>
               <span>— Películas, Series y Animes Online HD</span>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-6">
               <Link href="/" className="hover:text-zinc-300 transition">
                 Inicio
               </Link>
@@ -40,6 +40,18 @@ export default function RootLayout({
               </Link>
               <Link href="/catalog?type=animes" className="hover:text-zinc-300 transition">
                 Animes
+              </Link>
+              <Link
+                href="/privacy-policy"
+                className="text-zinc-400 hover:text-red-400 font-medium transition"
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                href="/terms-and-conditions"
+                className="text-zinc-400 hover:text-red-400 font-medium transition"
+              >
+                Terms and Conditions
               </Link>
             </div>
           </div>
