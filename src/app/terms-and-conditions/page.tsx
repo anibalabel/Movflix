@@ -200,8 +200,8 @@ export default function TermsAndConditionsPage() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-sm font-semibold text-red-400">
               <Mail className="w-4 h-4" />
-              <a href="mailto:soporte@docines.xyz" className="hover:underline">
-                soporte@docines.xyz
+              <a href="mailto:soporte@movflix.live" className="hover:underline">
+                soporte@movflix.live
               </a>
             </div>
 
