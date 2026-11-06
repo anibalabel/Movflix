@@ -82,8 +82,7 @@ export async function GET(
     if (rawItem.tmdb_id && (!overview || !poster_path || !backdrop_path)) {
       try {
         const tmdbRes = await fetch(
-          `https://api.themoviedb.org/3/${cfg.tmdbType}/${rawItem.tmdb_id}?language=es-MX&api_key=${TMDB_API_KEY}`,
-          { next: { revalidate: 3600 } }
+          `https://api.themoviedb.org/3/${cfg.tmdbType}/${rawItem.tmdb_id}?language=es-MX&api_key=${TMDB_API_KEY}`
         );
         if (tmdbRes.ok) {
           const tmdbData = await tmdbRes.json();
