@@ -1,0 +1,11 @@
+{"timestamp":"00:00:03.418","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:00:03.421","source":"Server","level":"LOG","message":"✓ Generated AGENTS.md for AI agents. Set `agentRules: false` in next.config to disable."}
+{"timestamp":"00:00:50.935","source":"Server","level":"LOG","message":"○ Compiling / ..."}
+{"timestamp":"00:00:55.981","source":"Browser","level":"INFO","message":"Download the React DevTools for a better development experience: https://react.dev/link/react-devtools"}
+{"timestamp":"00:01:54.627","source":"Browser","level":"INFO","message":"Download the React DevTools for a better development experience: https://react.dev/link/react-devtools"}
+{"timestamp":"00:06:19.159","source":"Browser","level":"INFO","message":"Download the React DevTools for a better development experience: https://react.dev/link/react-devtools"}
+{"timestamp":"00:08:01.447","source":"Server","level":"LOG","message":"✓ Compiled in 202ms"}
+{"timestamp":"00:10:04.366","source":"Browser","level":"INFO","message":"Download the React DevTools for a better development experience: https://react.dev/link/react-devtools"}
+{"timestamp":"00:13:50.313","source":"Server","level":"LOG","message":"✓ Compiled in 313ms"}
+{"timestamp":"00:24:01.055","source":"Server","level":"LOG","message":"✓ Compiled in 319ms"}
+{"timestamp":"00:28:37.783","source":"Browser","level":"INFO","message":"Download the React DevTools for a better development experience: https://react.dev/link/react-devtools"}

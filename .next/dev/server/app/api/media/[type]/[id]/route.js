@@ -1,0 +1,10 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/media/[type]/[id]/route.js")
+R.c("server/chunks/node_modules_next_0v_wh2el3dglu._.js")
+R.c("server/chunks/node_modules_mysql2_018y3bohznez2._.js")
+R.c("server/chunks/node_modules_iconv-lite_1hhx52c-h1n29._.js")
+R.c("server/chunks/node_modules_aws-ssl-profiles_lib_0-3pab2jten_2._.js")
+R.c("server/chunks/node_modules_0b41fxq4klu_f._.js")
+R.c("server/chunks/[root-of-the-server]__0eh8u5_0h5y4a._.js")
+R.c("server/chunks/_next-internal_server_app_api_media_[type]_[id]_route_actions_12jah7ppqeu09.js")
+R.m("[project]/node_modules/next/dist/esm/build/templates/app-route.js { INNER_APP_ROUTE => \"[project]/src/app/api/media/[type]/[id]/route.ts [app-route] (ecmascript)\" } [app-route] (ecmascript)")
+module.exports=R.m("[project]/node_modules/next/dist/esm/build/templates/app-route.js { INNER_APP_ROUTE => \"[project]/src/app/api/media/[type]/[id]/route.ts [app-route] (ecmascript)\" } [app-route] (ecmascript)").exports

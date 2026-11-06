@@ -1,0 +1,10 @@
+var R=require("../../../../../../chunks/[turbopack]_runtime.js")("server/app/api/episodes/[type]/[episodeId]/videos/route.js")
+R.c("server/chunks/node_modules_next_0c5vtfjzy0rrv._.js")
+R.c("server/chunks/node_modules_mysql2_018y3bohznez2._.js")
+R.c("server/chunks/node_modules_iconv-lite_1hhx52c-h1n29._.js")
+R.c("server/chunks/node_modules_aws-ssl-profiles_lib_0-3pab2jten_2._.js")
+R.c("server/chunks/node_modules_0b41fxq4klu_f._.js")
+R.c("server/chunks/[root-of-the-server]__1-04z8sgotv7_._.js")
+R.c("server/chunks/1oeh_server_app_api_episodes_[type]_[episodeId]_videos_route_actions_0thgc3ffuchzl.js")
+R.m("[project]/node_modules/next/dist/esm/build/templates/app-route.js { INNER_APP_ROUTE => \"[project]/src/app/api/episodes/[type]/[episodeId]/videos/route.ts [app-route] (ecmascript)\" } [app-route] (ecmascript)")
+module.exports=R.m("[project]/node_modules/next/dist/esm/build/templates/app-route.js { INNER_APP_ROUTE => \"[project]/src/app/api/episodes/[type]/[episodeId]/videos/route.ts [app-route] (ecmascript)\" } [app-route] (ecmascript)").exports

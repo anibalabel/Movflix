@@ -1,0 +1,14 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/catalog/route": "app/api/catalog/route.js",
+  "/api/episodes/[type]/[episodeId]/videos/route": "app/api/episodes/[type]/[episodeId]/videos/route.js",
+  "/api/media/[type]/[id]/route": "app/api/media/[type]/[id]/route.js",
+  "/api/stats/route": "app/api/stats/route.js",
+  "/catalog/page": "app/catalog/page.js",
+  "/page": "app/page.js",
+  "/watch/[type]/[id]/page": "app/watch/[type]/[id]/page.js"
+}
