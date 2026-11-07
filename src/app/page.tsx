@@ -46,6 +46,10 @@ export default function HomePage() {
     fetch('/api/stats')
       .then((res) => res.json())
       .then((json) => {
+        if (json.needsSetup) {
+          window.location.href = '/setup';
+          return;
+        }
         if (json.success) {
           setData(json);
         } else {
@@ -95,13 +99,21 @@ export default function HomePage() {
               {errorMsg}
             </p>
           )}
-          <button
-            type="button"
-            onClick={loadStats}
-            className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition cursor-pointer"
-          >
-            Reintentar conexión
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={loadStats}
+              className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition cursor-pointer"
+            >
+              Reintentar conexión
+            </button>
+            <Link
+              href="/setup"
+              className="px-5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold border border-zinc-700 transition"
+            >
+              Configurar Base de Datos
+            </Link>
+          </div>
         </div>
       </div>
     );

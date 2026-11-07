@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
-import { withDb, normalizeImageUrl } from '@/lib/db';
+import { withDb, normalizeImageUrl, isDatabaseConfigured } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 
 export async function GET() {
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json(
+      {
+        success: false,
+        needsSetup: true,
+        error: 'La base de datos no está configurada. Completa la instalación en /setup.',
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     return await withDb(async (conn) => {
       const [[countsRow]] = await conn.query<RowDataPacket[]>(

@@ -16,17 +16,17 @@ Utiliza toda la especificación técnica de este documento (credenciales de base
 
 ## 2. Credenciales de Conexión a la Base de Datos (MySQL)
 
-Los datos de conexión fueron extraídos de `apiweb/db_dooplex/config.php`:
+Los datos de conexión se configuran mediante variables de entorno (`.env.local`) o desde el instalador web (`/setup`):
 
 | Parámetro | Valor | Notas |
 | :--- | :--- | :--- |
 | **Motor / Driver** | `mysql` | PDO / MySQLi / mysql2 |
-| **Host (Desde el mismo hosting)** | `localhost` | Usar si los archivos PHP/Node corren en el mismo servidor (`app.movflix.live`) |
-| **Host (Conexión remota)** | `mysql.us.cloudlogin.co` | Host remoto del servidor MySQL |
+| **Host (Desde el mismo hosting)** | `localhost` | Usar si los archivos PHP/Node corren en el mismo servidor |
+| **Host (Conexión remota)** | `tu_host_mysql.com` | Host remoto del servidor MySQL |
 | **Puerto** | `3306` | Puerto estándar MySQL |
-| **Base de Datos (`DB_DATABASE`)** | `plusmovie_st` | Base de datos principal de Dooplex |
-| **Usuario (`DB_USERNAME`)** | `plusmovie_st` | Usuario con permisos de lectura/escritura |
-| **Contraseña (`DB_PASSWORD`)** | `5083038xS/@` | Contraseña de la base de datos |
+| **Base de Datos (`DB_DATABASE`)** | `tu_base_de_datos` | Base de datos principal de Dooplex |
+| **Usuario (`DB_USERNAME`)** | `tu_usuario_mysql` | Usuario con permisos de lectura/escritura |
+| **Contraseña (`DB_PASSWORD`)** | `tu_password_mysql` | Contraseña de la base de datos |
 | **Charset** | `utf8mb4` | Codificación recomendada |
 | **Collation** | `utf8mb4_unicode_ci` | Colación recomendada |
 
@@ -35,27 +35,27 @@ Los datos de conexión fueron extraídos de `apiweb/db_dooplex/config.php`:
 ```env
 # Conexión Base de Datos Dooplex
 DB_CONNECTION=mysql
-DB_HOST=mysql.us.cloudlogin.co
+DB_HOST=tu_host_mysql.com
 # Si se aloja en el mismo servidor cPanel/hosting usar: DB_HOST=localhost
 DB_PORT=3306
-DB_DATABASE=plusmovie_st
-DB_USERNAME=plusmovie_st
-DB_PASSWORD="5083038xS/@"
+DB_DATABASE=tu_base_de_datos
+DB_USERNAME=tu_usuario_mysql
+DB_PASSWORD="tu_password_mysql"
 DB_CHARSET=utf8mb4
 
 # URL Base de las APIs PHP actuales
-PUBLIC_API_BASE_URL=https://app.movflix.live
+PUBLIC_API_BASE_URL=https://tu-dominio.com
 ```
 
 ### Ejemplo de Conexión en PHP (PDO)
 
 ```php
 <?php
-$host = 'localhost'; // O 'mysql.us.cloudlogin.co' para acceso remoto
+$host = getenv('DB_HOST') ?: 'localhost';
 $port = 3306;
-$dbname = 'plusmovie_st';
-$username = 'plusmovie_st';
-$password = '5083038xS/@';
+$dbname = getenv('DB_DATABASE') ?: 'tu_base_de_datos';
+$username = getenv('DB_USERNAME') ?: 'tu_usuario_mysql';
+$password = getenv('DB_PASSWORD') ?: 'tu_password_mysql';
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
@@ -71,11 +71,11 @@ $pdo = new PDO($dsn, $username, $password, [
 import mysql from 'mysql2/promise';
 
 export const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'mysql.us.cloudlogin.co',
+  host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USERNAME || 'plusmovie_st',
-  password: process.env.DB_PASSWORD || '5083038xS/@',
-  database: process.env.DB_DATABASE || 'plusmovie_st',
+  user: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
   charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 10,
@@ -84,7 +84,7 @@ export const pool = mysql.createPool({
 
 ---
 
-## 3. Esquema de Tablas de la Base de Datos (`plusmovie_st`)
+## 3. Esquema de Tablas de la Base de Datos (Dooplex)
 
 La base de datos de Dooplex está organizada en **3 módulos de contenido** (Películas, Series y Animes) más la tabla de **Usuarios**.
 

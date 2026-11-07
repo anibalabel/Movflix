@@ -1,18 +1,201 @@
 import mysql, { Connection, RowDataPacket, ResultSetHeader, FieldPacket } from 'mysql2/promise';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import type { NextRequest } from 'next/server';
 
-const dbConfig = {
-  host: process.env.DB_HOST || 'mysql.us.cloudlogin.co',
-  port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USERNAME || 'plusmovie_st',
-  password: process.env.DB_PASSWORD || '5083038xS/@',
-  database: process.env.DB_DATABASE || 'plusmovie_st',
-  charset: 'utf8mb4',
-  connectTimeout: 15000,
-  // Required for Cloudflare Workers / Edge V8 isolates where eval() / new Function() is disallowed
-  disableEval: true,
-};
+export interface DbConnectionParams {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+}
+
+declare global {
+  var __DOOPLEX_DB_CONFIG: DbConnectionParams | undefined;
+}
+
+function readLocalConfigFile(): Partial<DbConnectionParams> | null {
+  try {
+    const filePath = path.join(process.cwd(), '.db-config.json');
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && parsed.host && parsed.database && parsed.user) {
+        return {
+          host: String(parsed.host).trim(),
+          port: Number(parsed.port) || 3306,
+          user: String(parsed.user).trim(),
+          password: String(parsed.password ?? ''),
+          database: String(parsed.database).trim(),
+        };
+      }
+    }
+  } catch {
+    // Ignore fs errors on serverless/edge runtimes
+  }
+  return null;
+}
+
+export function getResolvedDbConfig(): DbConnectionParams & {
+  isConfigured: boolean;
+  source: 'runtime' | 'file' | 'env' | 'none';
+} {
+  // 1. In-memory runtime config set during current session
+  if (
+    globalThis.__DOOPLEX_DB_CONFIG &&
+    globalThis.__DOOPLEX_DB_CONFIG.host &&
+    globalThis.__DOOPLEX_DB_CONFIG.database &&
+    globalThis.__DOOPLEX_DB_CONFIG.user
+  ) {
+    return {
+      ...globalThis.__DOOPLEX_DB_CONFIG,
+      isConfigured: true,
+      source: 'runtime',
+    };
+  }
+
+  // 2. Local installer file (.db-config.json)
+  const fromFile = readLocalConfigFile();
+  if (fromFile && fromFile.host && fromFile.database && fromFile.user) {
+    const resolved: DbConnectionParams = {
+      host: fromFile.host,
+      port: Number(fromFile.port) || 3306,
+      user: fromFile.user,
+      password: fromFile.password ?? '',
+      database: fromFile.database,
+    };
+    globalThis.__DOOPLEX_DB_CONFIG = resolved;
+    return {
+      ...resolved,
+      isConfigured: true,
+      source: 'file',
+    };
+  }
+
+  // 3. Environment variables (.env.local / hosting panel)
+  const envHost = (process.env.DB_HOST || '').trim();
+  const envDatabase = (process.env.DB_DATABASE || '').trim();
+  const envUser = (process.env.DB_USERNAME || '').trim();
+  const envPassword = process.env.DB_PASSWORD || '';
+  const envPort = Number(process.env.DB_PORT) || 3306;
+
+  if (envHost && envDatabase && envUser) {
+    return {
+      host: envHost,
+      port: envPort,
+      user: envUser,
+      password: envPassword,
+      database: envDatabase,
+      isConfigured: true,
+      source: 'env',
+    };
+  }
+
+  return {
+    host: '',
+    port: 3306,
+    user: '',
+    password: '',
+    database: '',
+    isConfigured: false,
+    source: 'none',
+  };
+}
+
+export function isDatabaseConfigured(): boolean {
+  return getResolvedDbConfig().isConfigured;
+}
+
+export function saveDbConfig(params: DbConnectionParams): { savedToFile: boolean; savedToEnv: boolean } {
+  const clean: DbConnectionParams = {
+    host: params.host.trim(),
+    port: Number(params.port) || 3306,
+    user: params.user.trim(),
+    password: params.password ?? '',
+    database: params.database.trim(),
+  };
+
+  globalThis.__DOOPLEX_DB_CONFIG = clean;
+  process.env.DB_HOST = clean.host;
+  process.env.DB_PORT = String(clean.port);
+  process.env.DB_DATABASE = clean.database;
+  process.env.DB_USERNAME = clean.user;
+  process.env.DB_PASSWORD = clean.password;
+
+  let savedToFile = false;
+  let savedToEnv = false;
+
+  try {
+    const jsonPath = path.join(process.cwd(), '.db-config.json');
+    fs.writeFileSync(
+      jsonPath,
+      JSON.stringify(
+        {
+          ...clean,
+          updatedAt: new Date().toISOString(),
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    savedToFile = true;
+  } catch {
+    // Ignore if read-only filesystem
+  }
+
+  try {
+    const envPath = path.join(process.cwd(), '.env.local');
+    let existingLines: string[] = [];
+    if (fs.existsSync(envPath)) {
+      existingLines = fs
+        .readFileSync(envPath, 'utf8')
+        .split(/\r?\n/)
+        .filter(
+          (line) =>
+            !line.startsWith('DB_CONNECTION=') &&
+            !line.startsWith('DB_HOST=') &&
+            !line.startsWith('DB_PORT=') &&
+            !line.startsWith('DB_DATABASE=') &&
+            !line.startsWith('DB_USERNAME=') &&
+            !line.startsWith('DB_PASSWORD=') &&
+            !line.startsWith('DB_CHARSET=')
+        );
+    }
+    const escapedPass = clean.password.replace(/"/g, '\\"');
+    const dbLines = [
+      'DB_CONNECTION=mysql',
+      `DB_HOST=${clean.host}`,
+      `DB_PORT=${clean.port}`,
+      `DB_DATABASE=${clean.database}`,
+      `DB_USERNAME=${clean.user}`,
+      `DB_PASSWORD="${escapedPass}"`,
+      'DB_CHARSET=utf8mb4',
+    ];
+    const finalContent = [...dbLines, ...existingLines.filter(Boolean)].join('\n') + '\n';
+    fs.writeFileSync(envPath, finalContent, 'utf8');
+    savedToEnv = true;
+  } catch {
+    // Ignore if read-only filesystem
+  }
+
+  return { savedToFile, savedToEnv };
+}
+
+export async function createCustomDbConnection(params: DbConnectionParams): Promise<Connection> {
+  return mysql.createConnection({
+    host: params.host.trim(),
+    port: Number(params.port) || 3306,
+    user: params.user.trim(),
+    password: params.password ?? '',
+    database: params.database.trim(),
+    charset: 'utf8mb4',
+    connectTimeout: 12000,
+    disableEval: true,
+  });
+}
 
 export const DEFAULT_AVATAR_PATH = '/api/avatars/image/avatar_default.png';
 export const DEFAULT_GOOGLE_CLIENT_ID =
@@ -107,7 +290,22 @@ export function getSessionUserFromRequest(request: NextRequest): SessionUserPayl
 }
 
 export async function createDbConnection(): Promise<Connection> {
-  return mysql.createConnection(dbConfig);
+  const cfg = getResolvedDbConfig();
+  if (!cfg.isConfigured) {
+    throw new Error(
+      'DB_NOT_CONFIGURED: La base de datos no está configurada. Completa la instalación en /setup.'
+    );
+  }
+  return mysql.createConnection({
+    host: cfg.host,
+    port: cfg.port,
+    user: cfg.user,
+    password: cfg.password,
+    database: cfg.database,
+    charset: 'utf8mb4',
+    connectTimeout: 15000,
+    disableEval: true,
+  });
 }
 
 export async function withDb<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {

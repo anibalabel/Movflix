@@ -7,3 +7,5 @@ out
 .env
 .env.*
 !.env.example
+.db-config.json
+apiweb/db_dooplex/config.local.php
