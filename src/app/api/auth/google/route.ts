@@ -196,6 +196,7 @@ export async function upsertGoogleUser(conn: Connection, googleData: GooglePaylo
            avatar = ?,
            email_verified_at = NOW(),
            last_login_at = NOW(),
+           created_at = COALESCE(created_at, NOW()),
            updated_at = NOW()
        WHERE id = ?`,
       [finalProviderId, finalAvatar, userId]

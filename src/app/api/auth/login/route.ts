@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
       await conn
         .query(
-          'UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = ?',
+          'UPDATE users SET last_login_at = NOW(), created_at = COALESCE(created_at, NOW()), updated_at = NOW() WHERE id = ?',
           [user.id]
         )
         .catch(() => {});
