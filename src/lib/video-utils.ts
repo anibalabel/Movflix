@@ -20,15 +20,42 @@ export interface NormalizedVideoLink extends RawVideoLink {
   langLabel: string;
   langFlag: string;
   serverLabel: string;
-  playerType: 'vidara' | 'hls' | 'mp4' | 'youtube' | 'embed';
+  playerType: 'vidara' | 'streamwish' | 'hls' | 'mp4' | 'youtube' | 'embed';
   playbackUrl: string;
   vidaraFilecode: string | null;
+  streamwishFilecode: string | null;
 }
+
+const STREAMWISH_HOST_KEYWORDS = [
+  'streamwish',
+  'vibuxer',
+  'hanerix',
+  'masukestin',
+  'hglink',
+  'jefferycontrolmodel',
+  'audinifer',
+  'sfastwish',
+  'flaswish',
+  'obeywish',
+  'cdnwish',
+  'asnwish',
+  'jodwish',
+  'swish',
+  'wishembed',
+  'hlswish',
+  'playerwish',
+  'streamhg',
+];
 
 const KNOWN_SERVERS: Record<string, string> = {
   vidara: 'Vidara',
   streamwish: 'StreamWish',
   vibuxer: 'StreamWish',
+  hanerix: 'StreamWish',
+  masukestin: 'StreamWish',
+  hglink: 'StreamWish',
+  jefferycontrolmodel: 'StreamWish',
+  audinifer: 'StreamWish',
   doodstream: 'Doodstream',
   dood: 'Doodstream',
   playmogo: 'Doodstream',
@@ -205,6 +232,50 @@ export function extractVidaraFilecode(link: string): string | null {
 }
 
 /**
+ * Extrae el filecode de StreamWish (o de cualquiera de sus dominios espejo en la BD)
+ * (ej. https://streamwish.fun/e/dpvxt82avem2 o https://masukestin.com/e/xudxdrmuetyg -> "dpvxt82avem2")
+ */
+export function extractStreamWishFilecode(
+  link: string,
+  rawServer?: string | null,
+  rawHeader?: string | null
+): string | null {
+  const trimmed = (link || '').trim();
+  if (!trimmed) return null;
+
+  let isStreamWishDomain = false;
+  try {
+    const url = new URL(trimmed);
+    const host = url.hostname.toLowerCase();
+    if (STREAMWISH_HOST_KEYWORDS.some((kw) => host.includes(kw))) {
+      isStreamWishDomain = true;
+    }
+  } catch {
+    // ignore
+  }
+
+  const meta = `${rawServer || ''} ${rawHeader || ''}`.toLowerCase();
+  const isStreamWishMeta =
+    meta.includes('streamwish') || meta.includes('vibuxer');
+
+  // Excluir dominios que pertenecen a otros servidores (como minochinos que a veces tiene header StreamWish pero ruta /embed/)
+  if (!isStreamWishDomain && !isStreamWishMeta) {
+    return null;
+  }
+
+  if (!isStreamWishDomain && trimmed.toLowerCase().includes('minochinos')) {
+    return null;
+  }
+
+  const match = trimmed.match(/\/(?:e|v|f|d)\/([a-zA-Z0-9_-]+)/i);
+  if (match && match[1]) {
+    return match[1];
+  }
+
+  return null;
+}
+
+/**
  * Normaliza enlaces de servidores embed como Vidara que en la BD vienen con `/v/`
  * (ej. https://vidara.so/v/qo1LOLLEEEw3i -> https://vidara.so/e/qo1LOLLEEEw3i)
  */
@@ -227,6 +298,11 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
   const rawLink = (video.link || '').trim();
   const link = normalizeEmbedPlaybackUrl(rawLink, video.server, video.header);
   const vidaraFilecode = extractVidaraFilecode(rawLink);
+  const streamwishFilecode = extractStreamWishFilecode(
+    rawLink,
+    video.server,
+    video.header
+  );
 
   const isHlsFlag = Number(video.hls) === 1;
   const isYoutubeFlag = Number(video.youtubelink) === 1;
@@ -245,12 +321,18 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     !lowerLink.includes('/e/') &&
     !lowerLink.includes('/embed');
 
-  let playerType: 'vidara' | 'hls' | 'mp4' | 'youtube' | 'embed' = 'embed';
+  let playerType: 'vidara' | 'streamwish' | 'hls' | 'mp4' | 'youtube' | 'embed' =
+    'embed';
   let playbackUrl = link;
 
-  // Rule 0: Vidara Direct Stream API (POST https://vidara.so/api/stream)
+  // Rule 0a: Vidara Direct Stream API (POST https://vidara.so/api/stream)
   if (vidaraFilecode) {
     playerType = 'vidara';
+  }
+  // Rule 0b: StreamWish Direct HLS Extractor (/api/streamwish)
+  else if (streamwishFilecode) {
+    playerType = 'streamwish';
+    playbackUrl = `https://streamwish.fun/e/${streamwishFilecode}`;
   }
   // Rule 1: HLS (.m3u8 or hls == 1 when not a direct .mp4 file)
   else if (lowerLink.includes('.m3u8') || (isHlsFlag && !isDirectVideoFile)) {
@@ -283,5 +365,6 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     playerType,
     playbackUrl,
     vidaraFilecode,
+    streamwishFilecode,
   };
 }

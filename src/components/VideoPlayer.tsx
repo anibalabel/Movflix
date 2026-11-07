@@ -109,9 +109,15 @@ export default function VideoPlayer({
     );
   }, [currentLangVideos, selectedVideoId]);
 
-  // Resolve Vidara direct streaming_url and thumbnail when activeVideo is Vidara
+  // Resolve Vidara or StreamWish direct streaming_url and thumbnail when activeVideo is 'vidara' or 'streamwish'
   useEffect(() => {
-    if (!activeVideo || activeVideo.playerType !== 'vidara' || !activeVideo.vidaraFilecode) {
+    const isVidara =
+      activeVideo?.playerType === 'vidara' && Boolean(activeVideo?.vidaraFilecode);
+    const isStreamWish =
+      activeVideo?.playerType === 'streamwish' &&
+      Boolean(activeVideo?.streamwishFilecode);
+
+    if (!activeVideo || (!isVidara && !isStreamWish)) {
       setVidaraInfo(null);
       setVidaraLoading(false);
       setVidaraStarted(false);
@@ -123,17 +129,29 @@ export default function VideoPlayer({
     setVidaraStarted(false);
     setVidaraInfo(null);
 
-    fetch('/api/vidara', {
+    const endpoint = isVidara ? '/api/vidara' : '/api/streamwish';
+    const payload = isVidara
+      ? { filecode: activeVideo.vidaraFilecode }
+      : {
+          filecode: activeVideo.streamwishFilecode,
+          url: activeVideo.playbackUrl,
+        };
+    const filecode =
+      (isVidara
+        ? activeVideo.vidaraFilecode
+        : activeVideo.streamwishFilecode) || '';
+
+    fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filecode: activeVideo.vidaraFilecode }),
+      body: JSON.stringify(payload),
     })
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
         if (data.success && data.streaming_url) {
           setVidaraInfo({
-            filecode: data.filecode,
+            filecode: data.filecode || filecode,
             streaming_url: data.streaming_url,
             thumbnail: data.thumbnail || null,
             title: data.title || null,
@@ -141,7 +159,7 @@ export default function VideoPlayer({
           });
         } else {
           setVidaraInfo({
-            filecode: activeVideo.vidaraFilecode!,
+            filecode,
             streaming_url: null,
             thumbnail: null,
             title: null,
@@ -152,7 +170,7 @@ export default function VideoPlayer({
       .catch(() => {
         if (cancelled) return;
         setVidaraInfo({
-          filecode: activeVideo.vidaraFilecode!,
+          filecode,
           streaming_url: null,
           thumbnail: null,
           title: null,
@@ -168,14 +186,15 @@ export default function VideoPlayer({
     };
   }, [activeVideo, iframeKey]);
 
-  // Determine effective HLS URL (either standard HLS server OR Vidara direct m3u8 once user clicks Play)
+  // Determine effective HLS URL (standard HLS server OR Vidara / StreamWish direct m3u8 once user clicks Play)
   const effectiveHlsUrl = useMemo(() => {
     if (!activeVideo) return null;
     if (activeVideo.playerType === 'hls') {
       return activeVideo.playbackUrl;
     }
     if (
-      activeVideo.playerType === 'vidara' &&
+      (activeVideo.playerType === 'vidara' ||
+        activeVideo.playerType === 'streamwish') &&
       vidaraStarted &&
       vidaraInfo?.streaming_url &&
       vidaraInfo.streaming_url.toLowerCase().includes('.m3u8')
@@ -203,6 +222,14 @@ export default function VideoPlayer({
       hls.attachMedia(videoEl);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         videoEl.play().catch(() => {});
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          // Si el token HLS falla por restricción de red/CORS, caer automáticamente al reproductor embed oficial
+          setVidaraInfo((prev) =>
+            prev ? { ...prev, streaming_url: null } : null
+          );
+        }
       });
     } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
       videoEl.src = effectiveHlsUrl;
@@ -397,7 +424,8 @@ export default function VideoPlayer({
                       : 'bg-zinc-950 text-zinc-500'
                   }`}
                 >
-                  {video.playerType === 'vidara'
+                  {video.playerType === 'vidara' ||
+                  video.playerType === 'streamwish'
                     ? 'DIRECTO'
                     : video.playerType === 'hls'
                     ? 'HLS'
@@ -421,14 +449,15 @@ export default function VideoPlayer({
       >
         {activeVideo ? (
           <>
-            {/* Mode 0: Vidara Direct Stream with Pre-Play Thumbnail Cover */}
-            {activeVideo.playerType === 'vidara' && (
+            {/* Mode 0: Vidara & StreamWish Direct Stream with Pre-Play Thumbnail Cover */}
+            {(activeVideo.playerType === 'vidara' ||
+              activeVideo.playerType === 'streamwish') && (
               <>
                 {vidaraLoading ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 gap-3">
                     <div className="w-11 h-11 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
                     <p className="text-xs sm:text-sm text-zinc-400">
-                      Obteniendo stream directo de Vidara...
+                      Extrayendo stream directo .m3u8 de {activeVideo.serverLabel}...
                     </p>
                   </div>
                 ) : vidaraInfo?.streaming_url ? (
@@ -454,7 +483,7 @@ export default function VideoPlayer({
                         </div>
                         <div className="space-y-1">
                           <span className="inline-block px-3 py-1 rounded-full bg-black/75 border border-zinc-700 text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-                            Vidara Stream Directo • Sin Anuncios
+                            {activeVideo.serverLabel} Stream Directo • Sin Anuncios
                           </span>
                           <p className="text-sm sm:text-base font-bold text-white drop-shadow">
                             Haz clic para reproducir {title}
@@ -554,11 +583,13 @@ export default function VideoPlayer({
               Reproduciendo en{' '}
               <strong className="text-zinc-200">{activeVideo.serverLabel}</strong> (
               {activeVideo.langFlag} {activeVideo.langLabel})
-              {activeVideo.playerType === 'vidara' && vidaraInfo?.streaming_url && (
-                <span className="ml-2 text-emerald-400 font-semibold">
-                  • Stream Directo HLS
-                </span>
-              )}
+              {(activeVideo.playerType === 'vidara' ||
+                activeVideo.playerType === 'streamwish') &&
+                vidaraInfo?.streaming_url && (
+                  <span className="ml-2 text-emerald-400 font-semibold">
+                    • Stream Directo HLS
+                  </span>
+                )}
             </span>
           </div>
           <a
