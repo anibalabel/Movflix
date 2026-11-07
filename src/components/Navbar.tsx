@@ -14,6 +14,7 @@ import {
   X,
   Home,
   ShieldCheck,
+  Heart,
 } from 'lucide-react';
 import LoginModal, { AuthUser } from './LoginModal';
 
@@ -34,7 +35,7 @@ export default function Navbar() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [pathname]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +49,9 @@ export default function Navbar() {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
+    if (pathname === '/dashboard') {
+      router.push('/');
+    }
   };
 
   const navLinks = [
@@ -102,6 +106,19 @@ export default function Navbar() {
                   </Link>
                 );
               })}
+              {user && (
+                <Link
+                  href="/dashboard"
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition ${
+                    pathname === '/dashboard'
+                      ? 'bg-rose-600/20 text-rose-400'
+                      : 'text-zinc-300 hover:text-white hover:bg-zinc-900'
+                  }`}
+                >
+                  <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+                  <span>Mis Favoritos</span>
+                </Link>
+              )}
             </nav>
           </div>
 
@@ -119,12 +136,16 @@ export default function Navbar() {
             </form>
 
             {user ? (
-              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-full pl-3 pr-2 py-1">
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-full pl-3 pr-1.5 py-1">
+                <Link
+                  href="/dashboard"
+                  title="Ir a mi Panel y Favoritos"
+                  className="flex items-center gap-1.5 hover:opacity-85 transition pr-1"
+                >
                   {user.role === 'admin' ? (
                     <ShieldCheck className="w-4 h-4 text-red-500" />
                   ) : (
-                    <User className="w-4 h-4 text-zinc-400" />
+                    <User className="w-4 h-4 text-rose-400" />
                   )}
                   <span className="text-xs font-semibold text-zinc-200 max-w-[110px] truncate">
                     {user.name}
@@ -134,7 +155,7 @@ export default function Navbar() {
                       Admin
                     </span>
                   )}
-                </div>
+                </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -194,6 +215,16 @@ export default function Navbar() {
                   </Link>
                 );
               })}
+              {user && (
+                <Link
+                  href="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="col-span-2 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-rose-600/20 border border-rose-500/30 text-rose-300 text-sm font-bold"
+                >
+                  <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+                  <span>Mi Panel y Favoritos</span>
+                </Link>
+              )}
             </div>
           </div>
         )}
@@ -202,9 +233,11 @@ export default function Navbar() {
       <LoginModal
         isOpen={loginOpen}
         onClose={() => setLoginOpen(false)}
-        onSuccess={(loggedUser) => setUser(loggedUser)}
+        onSuccess={(loggedUser) => {
+          setUser(loggedUser);
+          router.push('/dashboard');
+        }}
       />
     </>
   );
 }
-

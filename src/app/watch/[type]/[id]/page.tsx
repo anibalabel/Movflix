@@ -19,6 +19,7 @@ import {
   Layers,
   ArrowLeft,
   Hash,
+  Heart,
 } from 'lucide-react';
 
 interface EpisodeItem {
@@ -76,6 +77,53 @@ export default function WatchPage({
   const [selectedEpisode, setSelectedEpisode] = useState<EpisodeItem | null>(null);
   const [episodeVideos, setEpisodeVideos] = useState<NormalizedVideoLink[]>([]);
   const [loadingEpisodeVideos, setLoadingEpisodeVideos] = useState(false);
+
+  // Favorite state
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
+  const [favMessage, setFavMessage] = useState('');
+
+  useEffect(() => {
+    fetch('/api/favorites')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (json?.success && Array.isArray(json.data)) {
+          const found = json.data.some(
+            (item: { mediaType: string; id: number }) =>
+              item.mediaType === type && Number(item.id) === Number(id)
+          );
+          setIsFavorited(found);
+        }
+      })
+      .catch(() => {});
+  }, [type, id]);
+
+  const handleToggleFavorite = async () => {
+    if (!detail || favLoading) return;
+    setFavLoading(true);
+    setFavMessage('');
+    try {
+      const res = await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mediaType: detail.mediaType,
+          mediaId: detail.id,
+        }),
+      });
+      const data = await res.json();
+      if (res.status === 401) {
+        setFavMessage('Inicia sesión arriba en "Acceder" para guardar favoritos');
+      } else if (data.success) {
+        setIsFavorited(Boolean(data.favorited));
+        setFavMessage(data.message || '');
+      }
+    } catch {
+      setFavMessage('Error al guardar en favoritos');
+    } finally {
+      setFavLoading(false);
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -290,6 +338,31 @@ export default function WatchPage({
                   <Eye className="w-3.5 h-3.5" />
                   {detail.views.toLocaleString()} vistas
                 </span>
+
+                <button
+                  type="button"
+                  onClick={handleToggleFavorite}
+                  disabled={favLoading}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold border transition cursor-pointer ${
+                    isFavorited
+                      ? 'bg-rose-600 text-white border-rose-500 shadow-lg shadow-rose-600/30'
+                      : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-700'
+                  }`}
+                >
+                  <Heart
+                    className={`w-3.5 h-3.5 ${
+                      isFavorited ? 'fill-white text-white' : 'text-rose-500'
+                    }`}
+                  />
+                  <span>
+                    {isFavorited ? 'En tus Favoritos' : 'Agregar a Favoritos'}
+                  </span>
+                </button>
+                {favMessage && (
+                  <span className="text-xs text-rose-400 font-medium">
+                    {favMessage}
+                  </span>
+                )}
               </div>
 
               <div>
