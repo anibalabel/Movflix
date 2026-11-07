@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 76, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/basur/Documents/Movflix/src/app/api/auth/me/route.ts"],"sourcesContent":["import { NextRequest, NextResponse } from 'next/server';\n\nexport async function GET(request: NextRequest) {\n  const cookie = request.cookies.get('dooplex_session')?.value;\n  if (!cookie) {\n    return NextResponse.json({ authenticated: false, user: null });\n  }\n  try {\n    const user = JSON.parse(Buffer.from(cookie, 'base64').toString('utf8'));\n    return NextResponse.json({ authenticated: true, user });\n  } catch {\n    return NextResponse.json({ authenticated: false, user: null });\n  }\n}\n\n"],"names":["GET","request","cookie","cookies","get","value","json","authenticated","user","JSON","parse","Buffer","from","toString"],"mappings":";;;;AAAA;;AAEO,eAAeA,IAAIC,OAAoB;IAC5C,MAAMC,SAASD,QAAQE,OAAO,CAACC,GAAG,CAAC,oBAAoBC;IACvD,IAAI,CAACH,QAAQ;QACX,OAAO,gJAAY,CAACI,IAAI,CAAC;YAAEC,eAAe;YAAOC,MAAM;QAAK;IAC9D;IACA,IAAI;QACF,MAAMA,OAAOC,KAAKC,KAAK,CAACC,OAAOC,IAAI,CAACV,QAAQ,UAAUW,QAAQ,CAAC;QAC/D,OAAO,gJAAY,CAACP,IAAI,CAAC;YAAEC,eAAe;YAAMC;QAAK;IACvD,EAAE,OAAM;QACN,OAAO,gJAAY,CAACF,IAAI,CAAC;YAAEC,eAAe;YAAOC,MAAM;QAAK;IAC9D;AACF"}}]
-}
