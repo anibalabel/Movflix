@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import VideoPlayer from '@/components/VideoPlayer';
 import MediaCard, { MediaItemSummary } from '@/components/MediaCard';
+import CommentsSection from '@/components/CommentsSection';
 import { NormalizedVideoLink } from '@/lib/video-utils';
 import {
   Star,
@@ -591,6 +592,9 @@ export default function WatchPage({
               )}
             </section>
           )}
+
+        {/* Comments & Reactions Section */}
+        <CommentsSection mediaId={detail.id} mediaType={detail.mediaType} />
 
         {/* Related Content */}
         {detail.related && detail.related.length > 0 && (

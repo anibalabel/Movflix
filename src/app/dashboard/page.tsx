@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import MediaCard, { MediaItemSummary } from '@/components/MediaCard';
 import { AuthUser } from '@/components/LoginModal';
+import RequestsAndSuggestionsPanel from '@/components/RequestsAndSuggestionsPanel';
 import {
   Heart,
   User,
@@ -708,6 +709,9 @@ export default function UserDashboardPage() {
           </div>
         )}
       </section>
+
+      {/* Movie Requests & Suggestions Section */}
+      <RequestsAndSuggestionsPanel />
     </div>
   );
 }

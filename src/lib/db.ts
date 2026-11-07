@@ -1,5 +1,6 @@
 import mysql, { Connection, RowDataPacket, ResultSetHeader, FieldPacket } from 'mysql2/promise';
 import crypto from 'crypto';
+import type { NextRequest } from 'next/server';
 
 const dbConfig = {
   host: process.env.DB_HOST || 'mysql.us.cloudlogin.co',
@@ -45,6 +46,64 @@ export function createAccessToken(payload: Record<string, unknown>, expiresInSec
     .update(`${header}.${body}`)
     .digest('base64url');
   return `${header}.${body}.${signature}`;
+}
+
+export interface SessionUserPayload {
+  id: number;
+  username?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  avatar?: string | null;
+}
+
+export function getSessionUserFromRequest(request: NextRequest): SessionUserPayload | null {
+  // 1. Check dooplex_session cookie
+  const cookie = request.cookies.get('dooplex_session')?.value;
+  if (cookie) {
+    try {
+      const parsed = JSON.parse(Buffer.from(cookie, 'base64').toString('utf8'));
+      if (parsed && parsed.id) {
+        return {
+          id: Number(parsed.id),
+          username: parsed.username || parsed.name,
+          name: parsed.name || parsed.username,
+          email: parsed.email,
+          role: parsed.role || 'user',
+          avatar: parsed.avatar || null,
+        };
+      }
+    } catch {
+      // fallback to Authorization header
+    }
+  }
+
+  // 2. Check Authorization: Bearer <token>
+  const authHeader = request.headers.get('authorization');
+  if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+    const token = authHeader.slice(7).trim();
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      try {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+        const userId = Number(payload.sub || payload.id);
+        if (userId) {
+          return {
+            id: userId,
+            username: payload.name || payload.email,
+            name: payload.name || payload.email,
+            email: payload.email,
+            role: payload.role || 'user',
+            avatar: payload.avatar || null,
+          };
+        }
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return null;
 }
 
 export async function createDbConnection(): Promise<Connection> {
