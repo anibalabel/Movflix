@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Lock, Mail, LogIn, AlertCircle, CheckCircle2 } from 'lucide-react';
+import {
+  X,
+  Lock,
+  Mail,
+  LogIn,
+  UserPlus,
+  User,
+  AlertCircle,
+  CheckCircle2,
+} from 'lucide-react';
 
 export interface AuthUser {
   id: number;
@@ -19,28 +28,59 @@ interface LoginModalProps {
   onSuccess: (user: AuthUser) => void;
 }
 
-export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
+export default function LoginModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: LoginModalProps) {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
+  const switchMode = (newMode: 'login' | 'register') => {
+    setMode(newMode);
+    setError('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (mode === 'register') {
+      if (password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const endpoint =
+        mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      const payload =
+        mode === 'login'
+          ? { email, password }
+          : { name, email, password };
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setError(data.message || 'Credenciales inválidas');
+        setError(data.message || 'Ocurrió un error al procesar la solicitud');
       } else {
         onSuccess(data.data);
         onClose();
@@ -63,13 +103,43 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
           <X className="w-5 h-5" />
         </button>
 
+        {/* Mode Switcher Tabs */}
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 mb-6 mt-2">
+          <button
+            type="button"
+            onClick={() => switchMode('login')}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
+              mode === 'login'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <LogIn className="w-4 h-4" />
+            <span>Iniciar Sesión</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => switchMode('register')}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
+              mode === 'register'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Registrarse</span>
+          </button>
+        </div>
+
         <div className="mb-6 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-red-600/15 border border-red-500/30 flex items-center justify-center mx-auto mb-3">
-            <LogIn className="w-6 h-6 text-red-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-white">Iniciar Sesión en Dooplex</h2>
+          <h2 className="text-2xl font-bold text-white">
+            {mode === 'login' ? 'Bienvenido a Dooplex' : 'Crear Cuenta en Dooplex'}
+          </h2>
           <p className="text-sm text-zinc-400 mt-1">
-            Accede con tu cuenta de usuario o administrador de Dooplex
+            {mode === 'login'
+              ? 'Accede con tu cuenta de usuario de Dooplex'
+              : 'Regístrate gratis en segundos para acceder a la plataforma'}
           </p>
         </div>
 
@@ -81,14 +151,35 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === 'register' && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Nombre de Usuario
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Tu nombre o alias"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white text-sm focus:outline-none focus:border-red-500 transition"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Correo Electrónico o Usuario
+              {mode === 'login'
+                ? 'Correo Electrónico o Usuario'
+                : 'Correo Electrónico'}
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                type="text"
+                type={mode === 'login' ? 'text' : 'email'}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -107,6 +198,7 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
               <input
                 type="password"
                 required
+                minLength={mode === 'register' ? 6 : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -114,6 +206,26 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
               />
             </div>
           </div>
+
+          {mode === 'register' && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Confirmar Contraseña
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repite tu contraseña"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white text-sm focus:outline-none focus:border-red-500 transition"
+                />
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -125,13 +237,41 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
             ) : (
               <>
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Entrar a la Plataforma</span>
+                <span>
+                  {mode === 'login' ? 'Entrar a la Plataforma' : 'Crear mi Cuenta'}
+                </span>
               </>
             )}
           </button>
         </form>
+
+        {/* Bottom Switch Link */}
+        <div className="mt-5 pt-4 border-t border-zinc-800/80 text-center text-xs text-zinc-400">
+          {mode === 'login' ? (
+            <>
+              ¿Aún no tienes una cuenta?{' '}
+              <button
+                type="button"
+                onClick={() => switchMode('register')}
+                className="text-red-400 hover:text-red-300 font-bold hover:underline cursor-pointer"
+              >
+                Regístrate gratis aquí
+              </button>
+            </>
+          ) : (
+            <>
+              ¿Ya tienes una cuenta registrada?{' '}
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="text-red-400 hover:text-red-300 font-bold hover:underline cursor-pointer"
+              >
+                Inicia sesión aquí
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
-
