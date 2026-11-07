@@ -25,8 +25,7 @@ export async function GET() {
                 release_date, overview, quality, vote_average, type, genre, premuim, position, custom, custom_link
          FROM featureds
          WHERE featured_id IS NOT NULL
-         ORDER BY position ASC, id DESC
-         LIMIT 10`
+         ORDER BY position ASC, id DESC`
       );
 
       const [latestMovies] = await conn.query<RowDataPacket[]>(
