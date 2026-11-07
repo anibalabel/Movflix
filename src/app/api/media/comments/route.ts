@@ -87,8 +87,24 @@ export async function GET(request: NextRequest) {
 
       const data = rows.map((r) => {
         const cid = Number(r.id);
-        const rawName = String(r.user_name || r.fallback_user_name || 'Usuario').trim();
-        const rawImage = String(r.user_image || r.fallback_user_avatar || '').trim();
+        // Priorizar siempre el nombre y avatar actual de la tabla `users` (u.name, u.avatar)
+        const rawName = String(
+          r.fallback_user_name || r.user_name || 'Usuario'
+        ).trim();
+        const dbAvatar = String(r.fallback_user_avatar || '').trim();
+        const commentAvatar = String(r.user_image || '').trim();
+
+        const isDbAvatarReal =
+          dbAvatar !== '' && !dbAvatar.includes('avatar_default.png');
+        const isCommentAvatarReal =
+          commentAvatar !== '' && !commentAvatar.includes('avatar_default.png');
+
+        const bestAvatar = isDbAvatarReal
+          ? dbAvatar
+          : isCommentAvatarReal
+          ? commentAvatar
+          : dbAvatar || commentAvatar;
+
         return {
           id: cid,
           commentable_type: r.commentable_type,
@@ -97,7 +113,9 @@ export async function GET(request: NextRequest) {
           is_approved: Boolean(r.is_approved),
           user_id: Number(r.user_id),
           user_name: rawName || 'Usuario',
-          user_image: rawImage ? normalizeAvatarUrl(rawImage) : DEFAULT_AVATAR_PATH,
+          user_image: bestAvatar
+            ? normalizeAvatarUrl(bestAvatar)
+            : DEFAULT_AVATAR_PATH,
           likes_count: Number(r.likes_count || 0),
           dislikes_count: Number(r.dislikes_count || 0),
           my_reaction: reactionMap.get(cid) || null,

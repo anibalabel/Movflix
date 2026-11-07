@@ -51,6 +51,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
+    window.dispatchEvent(new Event('dooplex-auth-changed'));
     if (pathname === '/dashboard') {
       router.push('/');
     }
@@ -245,6 +246,8 @@ export default function Navbar() {
         onClose={() => setLoginOpen(false)}
         onSuccess={(loggedUser) => {
           setUser(loggedUser);
+          setAvatarError(false);
+          window.dispatchEvent(new Event('dooplex-auth-changed'));
           router.push('/dashboard');
         }}
       />

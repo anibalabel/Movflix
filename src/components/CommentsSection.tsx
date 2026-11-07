@@ -42,6 +42,8 @@ export default function CommentsSection({
   const [error, setError] = useState('');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string>('user');
+  const [currentUserName, setCurrentUserName] = useState<string>('');
+  const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
@@ -58,8 +60,12 @@ export default function CommentsSection({
       if (meData?.authenticated && meData.user?.id) {
         setCurrentUserId(Number(meData.user.id));
         setCurrentUserRole(meData.user.role || 'user');
+        setCurrentUserName(meData.user.name || meData.user.username || 'Usuario');
+        setCurrentUserAvatar(meData.user.avatar || null);
       } else {
         setCurrentUserId(null);
+        setCurrentUserName('');
+        setCurrentUserAvatar(null);
       }
 
       const data = await commentsRes.json();
@@ -77,6 +83,13 @@ export default function CommentsSection({
     if (mediaId) {
       fetchComments();
     }
+    const handleAuthChange = () => {
+      if (mediaId) fetchComments();
+    };
+    window.addEventListener('dooplex-auth-changed', handleAuthChange);
+    return () => {
+      window.removeEventListener('dooplex-auth-changed', handleAuthChange);
+    };
   }, [mediaId, fetchComments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -184,15 +197,33 @@ export default function CommentsSection({
       {/* New Comment Form (Only for Registered / Logged-in Users) */}
       {currentUserId ? (
         <form onSubmit={handleSubmit} className="space-y-3">
-          <textarea
-            rows={3}
-            maxLength={1000}
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Escribe tu comentario sobre este título (máx. 1000 caracteres)..."
-            className="w-full px-4 py-3 rounded-2xl bg-zinc-950 border border-zinc-800 text-white text-sm focus:outline-none focus:border-red-500 transition resize-none"
-          />
-          <div className="flex items-center justify-between">
+          <div className="flex items-start gap-3.5">
+            <img
+              src={currentUserAvatar || '/api/avatars/image/avatar_default.png'}
+              alt={currentUserName}
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src =
+                  '/api/avatars/image/avatar_default.png';
+              }}
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-zinc-700 shrink-0 mt-0.5"
+            />
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <span>Comentando como</span>
+                <strong className="text-white">{currentUserName}</strong>
+              </div>
+              <textarea
+                rows={3}
+                maxLength={1000}
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Escribe tu comentario sobre este título (máx. 1000 caracteres)..."
+                className="w-full px-4 py-3 rounded-2xl bg-zinc-950 border border-zinc-800 text-white text-sm focus:outline-none focus:border-red-500 transition resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between pl-13 sm:pl-14">
             <span className="text-xs text-zinc-500">
               {commentText.length} / 1000 caracteres
             </span>
