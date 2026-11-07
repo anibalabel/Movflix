@@ -51,9 +51,14 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      const forceSyncAvatar =
+        request.nextUrl.searchParams.get('state') === 'sync_avatar' ||
+        request.nextUrl.searchParams.get('sync_avatar') === '1';
+
       const { userData, expiresIn, accessToken } = await upsertGoogleUser(
         conn,
-        googleData
+        googleData,
+        forceSyncAvatar
       );
 
       const cookiePayload = Buffer.from(JSON.stringify(userData)).toString('base64');

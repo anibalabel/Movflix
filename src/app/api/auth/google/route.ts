@@ -134,7 +134,11 @@ export async function resolveGooglePayload(
   };
 }
 
-export async function upsertGoogleUser(conn: Connection, googleData: GooglePayload) {
+export async function upsertGoogleUser(
+  conn: Connection,
+  googleData: GooglePayload,
+  forceSyncAvatar = false
+) {
   const providerId = String(googleData.sub || googleData.id || '').trim();
   const email = String(googleData.email || '').trim().toLowerCase();
 
@@ -177,7 +181,7 @@ export async function upsertGoogleUser(conn: Connection, googleData: GooglePaylo
   let finalAvatar = picture;
 
   if (existingRows && existingRows.length > 0) {
-    // Usuario existente: actualiza provider_name = "google", provider_id, avatar (si no tenía), email_verified_at, last_login_at y updated_at
+    // Usuario existente: actualiza provider_name = "google", provider_id, avatar, email_verified_at, last_login_at y updated_at
     const existing = existingRows[0];
     userId = Number(existing.id);
     userRole = existing.role || 'user';
@@ -185,11 +189,14 @@ export async function upsertGoogleUser(conn: Connection, googleData: GooglePaylo
     userPremium = Boolean(existing.premuim);
 
     const currentAvatar = String(existing.avatar || '').trim();
-    const hasCustomAvatar =
-      currentAvatar !== '' &&
-      !currentAvatar.includes('/api/avatars/image/avatar_default.png');
+    const isDefaultOrGoogleAvatar =
+      currentAvatar === '' ||
+      currentAvatar.includes('/api/avatars/image/avatar_default.png') ||
+      currentAvatar.includes('googleusercontent.com');
 
-    finalAvatar = hasCustomAvatar ? currentAvatar : picture;
+    // Si forceSyncAvatar es true o si el usuario tenía avatar vacío/default/de Google, actualiza con la foto actual de Google
+    finalAvatar =
+      forceSyncAvatar || isDefaultOrGoogleAvatar ? picture : currentAvatar;
     const finalProviderId = providerId || existing.provider_id || null;
 
     await conn.query(
@@ -296,6 +303,7 @@ export async function GET(request: NextRequest) {
           request.nextUrl.searchParams.get('redirect_uri') ||
           settings.google_redirect_uri ||
           'https://docines.us/auth/google/callback';
+        const syncAvatar = request.nextUrl.searchParams.get('sync_avatar') === '1';
         const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         authUrl.searchParams.set('client_id', settings.google_client_id);
         authUrl.searchParams.set('redirect_uri', callbackUrl);
@@ -303,6 +311,9 @@ export async function GET(request: NextRequest) {
         authUrl.searchParams.set('scope', 'openid email profile');
         authUrl.searchParams.set('access_type', 'online');
         authUrl.searchParams.set('prompt', 'select_account');
+        if (syncAvatar) {
+          authUrl.searchParams.set('state', 'sync_avatar');
+        }
         return NextResponse.redirect(authUrl.toString());
       }
 
@@ -342,7 +353,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const { userData, expiresIn, accessToken } = await upsertGoogleUser(conn, googleData);
+      const forceSyncAvatar = Boolean(body.sync_avatar);
+      const { userData, expiresIn, accessToken } = await upsertGoogleUser(
+        conn,
+        googleData,
+        forceSyncAvatar
+      );
 
       // Respuesta 200 OK compatible tanto con la App como con la Web
       const response = NextResponse.json(
