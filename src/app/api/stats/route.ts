@@ -19,23 +19,14 @@ export async function GET() {
         'SELECT id, name FROM genres ORDER BY name ASC'
       );
 
-      const [heroMovies] = await conn.query<RowDataPacket[]>(
-        `SELECT m.id, m.tmdb_id, m.title, m.overview, m.poster_path, m.backdrop_path, m.backdrop_path_tv,
-                m.vote_average, m.release_date, m.runtime, m.views,
-                (SELECT COUNT(*) FROM movie_videos mv WHERE mv.movie_id = m.id) as video_count
-         FROM movies m
-         WHERE m.active = 1 AND (m.backdrop_path IS NOT NULL OR m.backdrop_path_tv IS NOT NULL)
-         ORDER BY m.featured DESC, m.pinned DESC, m.popularity DESC, m.id DESC
-         LIMIT 5`
-      );
-
-      const [heroSeries] = await conn.query<RowDataPacket[]>(
-        `SELECT s.id, s.tmdb_id, s.name as title, s.overview, s.poster_path, s.backdrop_path, s.backdrop_path_tv,
-                s.vote_average, s.first_air_date as release_date, s.views
-         FROM series s
-         WHERE s.active = 1 AND (s.backdrop_path IS NOT NULL OR s.backdrop_path_tv IS NOT NULL)
-         ORDER BY s.featured DESC, s.pinned DESC, s.popularity DESC, s.id DESC
-         LIMIT 3`
+      // 1. Consultar directamente la tabla `featureds` de Dooplex para el Slider "Destacado Dooplex"
+      const [featuredRows] = await conn.query<RowDataPacket[]>(
+        `SELECT id, featured_id, title, poster_path, backdrop_path, backdrop_path_tv,
+                release_date, overview, quality, vote_average, type, genre, premuim, position, custom, custom_link
+         FROM featureds
+         WHERE featured_id IS NOT NULL
+         ORDER BY position ASC, id DESC
+         LIMIT 10`
       );
 
       const [latestMovies] = await conn.query<RowDataPacket[]>(
@@ -94,10 +85,27 @@ export async function GET() {
         mediaType,
       });
 
-      const heroItems = [
-        ...heroMovies.map((m) => formatItem(m, 'movies')),
-        ...heroSeries.map((s) => formatItem(s, 'series')),
-      ].slice(0, 6);
+      const mapFeaturedType = (rawType: string | null): 'movies' | 'series' | 'animes' => {
+        const t = String(rawType || '').toLowerCase();
+        if (t.includes('serie') || t.includes('tv')) return 'series';
+        if (t.includes('anime')) return 'animes';
+        return 'movies';
+      };
+
+      const heroItems = featuredRows.map((f) => ({
+        id: Number(f.featured_id),
+        featured_row_id: Number(f.id),
+        title: f.title || 'Sin título',
+        overview: f.overview || '',
+        poster_path: normalizeImageUrl(f.poster_path, 'w500'),
+        backdrop_path: normalizeImageUrl(f.backdrop_path_tv || f.backdrop_path, 'original'),
+        vote_average: Number(f.vote_average || 0),
+        release_date: f.release_date || null,
+        quality: f.quality || null,
+        genre: f.genre || null,
+        position: Number(f.position || 0),
+        mediaType: mapFeaturedType(f.type),
+      }));
 
       return NextResponse.json({
         success: true,

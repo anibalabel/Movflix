@@ -143,6 +143,16 @@ export default function HomePage() {
                     ? 'Serie TV'
                     : 'Anime'}
                 </span>
+                {activeHero.genre && (
+                  <span className="px-2.5 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-zinc-300 text-xs font-medium">
+                    {activeHero.genre}
+                  </span>
+                )}
+                {activeHero.quality && (
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold uppercase">
+                    {activeHero.quality}
+                  </span>
+                )}
                 {activeHero.vote_average > 0 && (
                   <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 border border-amber-500/30 text-amber-400 text-xs font-bold">
                     <Star className="w-3.5 h-3.5 fill-amber-400" />

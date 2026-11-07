@@ -16,6 +16,8 @@ export interface MediaItemSummary {
   views?: number;
   video_count?: number;
   season_count?: number;
+  quality?: string | null;
+  genre?: string | null;
   mediaType: 'movies' | 'series' | 'animes';
 }
 
