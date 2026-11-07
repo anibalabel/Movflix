@@ -1,4 +1,9 @@
 node_modules
 .next
+.open-next
+.wrangler
 out
 *.log
+.env
+.env.*
+!.env.example
