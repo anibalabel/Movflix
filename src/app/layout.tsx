@@ -21,12 +21,14 @@ export default function RootLayout({
         <main className="flex-1">{children}</main>
         <footer className="border-t border-zinc-900 bg-zinc-950/90 py-10 mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center text-white font-black text-xs">
                 D
               </div>
               <span className="font-bold text-zinc-300">DOOPLEX</span>
-              <span>— Películas, Series y Animes Online HD</span>
+              <span>© 2025–{new Date().getFullYear()} Todos los derechos reservados</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="hidden sm:inline">Películas, Series y Animes Online HD</span>
             </div>
             <div className="flex flex-wrap items-center gap-6">
               <Link href="/" className="hover:text-zinc-300 transition">
