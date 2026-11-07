@@ -15,6 +15,7 @@ import {
   Home,
   ShieldCheck,
   Heart,
+  Smartphone,
 } from 'lucide-react';
 import LoginModal, { AuthUser } from './LoginModal';
 
@@ -70,6 +71,7 @@ export default function Navbar() {
     { href: '/catalog?type=movies', label: 'Películas', icon: Film },
     { href: '/catalog?type=series', label: 'Series', icon: Tv },
     { href: '/catalog?type=animes', label: 'Animes', icon: Sparkles },
+    { href: '/apps', label: 'Descargar App', icon: Smartphone, isAppBadge: true },
   ];
 
   return (
@@ -99,6 +101,8 @@ export default function Navbar() {
                 const isActive =
                   item.href === '/'
                     ? pathname === '/'
+                    : item.href === '/apps'
+                    ? pathname === '/apps'
                     : pathname.startsWith('/catalog') &&
                       typeof window !== 'undefined' &&
                       window.location.href.includes(item.href);
@@ -109,11 +113,18 @@ export default function Navbar() {
                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition ${
                       isActive
                         ? 'bg-red-600/15 text-red-400'
+                        : item.isAppBadge
+                        ? 'bg-gradient-to-r from-red-600/15 to-blue-600/15 border border-red-500/30 text-white hover:border-red-400/60'
                         : 'text-zinc-300 hover:text-white hover:bg-zinc-900'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className={`w-4 h-4 ${item.isAppBadge ? 'text-red-400' : ''}`} />
                     <span>{item.label}</span>
+                    {item.isAppBadge && (
+                      <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full bg-red-600 text-white">
+                        TV &amp; Móvil
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -227,10 +238,19 @@ export default function Navbar() {
                     key={item.href}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-900/80 text-zinc-200 text-sm font-medium hover:bg-zinc-800"
+                    className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium hover:bg-zinc-800 ${
+                      item.isAppBadge
+                        ? 'col-span-2 justify-center bg-gradient-to-r from-red-600/20 to-blue-600/20 border border-red-500/30 text-white font-bold'
+                        : 'bg-zinc-900/80 text-zinc-200'
+                    }`}
                   >
                     <Icon className="w-4 h-4 text-red-500" />
                     <span>{item.label}</span>
+                    {item.isAppBadge && (
+                      <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-red-600 text-white">
+                        Play Store &amp; Android TV
+                      </span>
+                    )}
                   </Link>
                 );
               })}

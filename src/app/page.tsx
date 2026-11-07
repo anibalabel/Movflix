@@ -14,7 +14,9 @@ import {
   ChevronLeft,
   Flame,
   Calendar,
+  Smartphone,
 } from 'lucide-react';
+import { APP_DOWNLOAD_CONFIG } from '@/lib/app-downloads';
 
 interface HomeStatsResponse {
   success: boolean;
@@ -321,6 +323,64 @@ export default function HomePage() {
             </div>
           </div>
         )}
+
+        {/* Official App Download Showcase Banner */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-950/60 via-zinc-900/95 to-blue-950/60 border border-red-500/30 p-5 sm:p-6 shadow-xl">
+          <div className="pointer-events-none absolute -top-20 -right-20 w-56 h-56 bg-blue-600/15 blur-3xl rounded-full" />
+          <div className="pointer-events-none absolute -bottom-20 -left-20 w-56 h-56 bg-red-600/15 blur-3xl rounded-full" />
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-5">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center shadow-lg shadow-red-600/30 shrink-0 p-3">
+                <Smartphone className="w-7 h-7 text-white" />
+              </div>
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-red-600 text-white">
+                    NUEVO
+                  </span>
+                  <span className="text-xs font-bold text-red-400 uppercase tracking-wider">
+                    App Oficial Disponible
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-extrabold text-white">
+                  ¡Descarga nuestra App para Android y Android TV!
+                </h3>
+                <p className="text-xs sm:text-sm text-zinc-300 max-w-xl">
+                  Disponible oficialmente en <strong>Google Play Store</strong> para tu teléfono y en edición especial para <strong>Smart TV / Fire TV</strong> (Código Downloader:{' '}
+                  <span className="font-mono font-black text-orange-400 bg-orange-500/15 px-1.5 py-0.5 rounded border border-orange-500/30">
+                    {APP_DOWNLOAD_CONFIG.androidTvDownloaderCode}
+                  </span>
+                  ).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
+              <a
+                href={APP_DOWNLOAD_CONFIG.googlePlayUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 text-xs sm:text-sm font-extrabold shadow-lg transition"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 512 512" fill="none">
+                  <path
+                    d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"
+                    fill="#E50914"
+                  />
+                </svg>
+                <span>Google Play</span>
+              </a>
+
+              <Link
+                href="/apps"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-blue-600/25 transition"
+              >
+                <Tv className="w-4 h-4" />
+                <span>Android TV &amp; Más Info</span>
+              </Link>
+            </div>
+          </div>
+        </div>
 
         {/* Genre Quick Filter Bar */}
         {data?.genres && data.genres.length > 0 && (
