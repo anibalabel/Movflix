@@ -1,28 +1,38 @@
-import mysql from 'mysql2/promise';
+import mysql, { Connection, RowDataPacket, ResultSetHeader, FieldPacket } from 'mysql2/promise';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var _mysqlPool: mysql.Pool | undefined;
+const dbConfig = {
+  host: process.env.DB_HOST || 'mysql.us.cloudlogin.co',
+  port: Number(process.env.DB_PORT) || 3306,
+  user: process.env.DB_USERNAME || 'plusmovie_st',
+  password: process.env.DB_PASSWORD || '5083038xS/@',
+  database: process.env.DB_DATABASE || 'plusmovie_st',
+  charset: 'utf8mb4',
+  connectTimeout: 15000,
+  // Required for Cloudflare Workers / Edge V8 isolates where eval() / new Function() is disallowed
+  disableEval: true,
+};
+
+export async function createDbConnection(): Promise<Connection> {
+  return mysql.createConnection(dbConfig);
 }
 
-export const pool: mysql.Pool =
-  global._mysqlPool ||
-  mysql.createPool({
-    host: process.env.DB_HOST || 'mysql.us.cloudlogin.co',
-    port: Number(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USERNAME || 'plusmovie_st',
-    password: process.env.DB_PASSWORD || '5083038xS/@',
-    database: process.env.DB_DATABASE || 'plusmovie_st',
-    charset: 'utf8mb4',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    connectTimeout: 15000,
-  });
-
-if (process.env.NODE_ENV !== 'production') {
-  global._mysqlPool = pool;
+export async function withDb<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
+  const conn = await createDbConnection();
+  try {
+    return await fn(conn);
+  } finally {
+    await conn.end().catch(() => {});
+  }
 }
+
+export const pool = {
+  async query<T extends RowDataPacket[] | ResultSetHeader = RowDataPacket[]>(
+    sql: string,
+    values?: unknown
+  ): Promise<[T, FieldPacket[]]> {
+    return withDb((conn) => conn.query<T>(sql, values as never));
+  },
+};
 
 export const TMDB_API_KEY = process.env.TMDB_API_KEY || '1559f1f0a886aa7e93f22e09c47b9c9e';
 
@@ -45,4 +55,3 @@ export function normalizeImageUrl(
   }
   return trimmed;
 }
-

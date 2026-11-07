@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pool, normalizeImageUrl } from '@/lib/db';
+import { withDb, normalizeImageUrl } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 
 export async function GET(request: NextRequest) {
@@ -76,58 +76,60 @@ export async function GET(request: NextRequest) {
       orderBySql = 'ORDER BY m.views DESC, m.id DESC';
     }
 
-    const countQuery = `SELECT COUNT(DISTINCT m.id) as total FROM ${cfg.table} m ${joinClause} ${whereSql}`;
-    const [[countRow]] = await pool.query<RowDataPacket[]>(countQuery, params);
-    const total = Number(countRow?.total || 0);
+    return await withDb(async (conn) => {
+      const countQuery = `SELECT COUNT(DISTINCT m.id) as total FROM ${cfg.table} m ${joinClause} ${whereSql}`;
+      const [[countRow]] = await conn.query<RowDataPacket[]>(countQuery, params);
+      const total = Number(countRow?.total || 0);
 
-    const dataQuery = `
-      SELECT DISTINCT
-        m.id,
-        m.tmdb_id,
-        m.${cfg.titleCol} as title,
-        m.original_name,
-        m.overview,
-        m.poster_path,
-        m.backdrop_path,
-        m.backdrop_path_tv,
-        m.vote_average,
-        m.${cfg.dateCol} as release_date,
-        m.views,
-        m.premuim,
-        ${cfg.subCountSql}
-      FROM ${cfg.table} m
-      ${joinClause}
-      ${whereSql}
-      ${orderBySql}
-      LIMIT ? OFFSET ?
-    `;
+      const dataQuery = `
+        SELECT DISTINCT
+          m.id,
+          m.tmdb_id,
+          m.${cfg.titleCol} as title,
+          m.original_name,
+          m.overview,
+          m.poster_path,
+          m.backdrop_path,
+          m.backdrop_path_tv,
+          m.vote_average,
+          m.${cfg.dateCol} as release_date,
+          m.views,
+          m.premuim,
+          ${cfg.subCountSql}
+        FROM ${cfg.table} m
+        ${joinClause}
+        ${whereSql}
+        ${orderBySql}
+        LIMIT ? OFFSET ?
+      `;
 
-    const [rows] = await pool.query<RowDataPacket[]>(dataQuery, [...params, limit, offset]);
+      const [rows] = await conn.query<RowDataPacket[]>(dataQuery, [...params, limit, offset]);
 
-    const data = rows.map((item) => ({
-      id: item.id,
-      tmdb_id: item.tmdb_id,
-      title: item.title || item.original_name || 'Sin título',
-      original_name: item.original_name || '',
-      overview: item.overview || '',
-      poster_path: normalizeImageUrl(item.poster_path, 'w500'),
-      backdrop_path: normalizeImageUrl(item.backdrop_path_tv || item.backdrop_path, 'original'),
-      vote_average: Number(item.vote_average || 0),
-      release_date: item.release_date || null,
-      views: Number(item.views || 0),
-      video_count: Number(item.video_count || 0),
-      season_count: Number(item.season_count || 0),
-      mediaType: type,
-    }));
+      const data = rows.map((item) => ({
+        id: item.id,
+        tmdb_id: item.tmdb_id,
+        title: item.title || item.original_name || 'Sin título',
+        original_name: item.original_name || '',
+        overview: item.overview || '',
+        poster_path: normalizeImageUrl(item.poster_path, 'w500'),
+        backdrop_path: normalizeImageUrl(item.backdrop_path_tv || item.backdrop_path, 'original'),
+        vote_average: Number(item.vote_average || 0),
+        release_date: item.release_date || null,
+        views: Number(item.views || 0),
+        video_count: Number(item.video_count || 0),
+        season_count: Number(item.season_count || 0),
+        mediaType: type,
+      }));
 
-    return NextResponse.json({
-      success: true,
-      type,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-      data,
+      return NextResponse.json({
+        success: true,
+        type,
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        data,
+      });
     });
   } catch (error: unknown) {
     console.error('Error in /api/catalog:', error);
@@ -140,4 +142,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

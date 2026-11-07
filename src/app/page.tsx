@@ -37,18 +37,30 @@ interface HomeStatsResponse {
 export default function HomePage() {
   const [data, setData] = useState<HomeStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
 
-  useEffect(() => {
+  const loadStats = () => {
+    setLoading(true);
+    setErrorMsg(null);
     fetch('/api/stats')
       .then((res) => res.json())
       .then((json) => {
         if (json.success) {
           setData(json);
+        } else {
+          setErrorMsg(json.error || 'No se pudo cargar el catálogo');
         }
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        setErrorMsg('Error de conexión con la API del catálogo');
+      })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadStats();
   }, []);
 
   // Auto-rotate hero slider every 7s
@@ -67,6 +79,30 @@ export default function HomePage() {
         <p className="text-zinc-400 text-sm font-medium">
           Cargando catálogo de Dooplex...
         </p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center gap-4">
+        <div className="max-w-md rounded-2xl bg-zinc-900/90 border border-zinc-800 p-6 space-y-4">
+          <h2 className="text-lg font-bold text-white">
+            No se pudo conectar con el catálogo
+          </h2>
+          {errorMsg && (
+            <p className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-xl p-3 font-mono break-all">
+              {errorMsg}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={loadStats}
+            className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition cursor-pointer"
+          >
+            Reintentar conexión
+          </button>
+        </div>
       </div>
     );
   }
