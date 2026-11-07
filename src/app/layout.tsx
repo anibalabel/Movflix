@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: 'Dooplex Streaming — Películas, Series y Animes Online HD',
   description:
     'Disfruta de películas, series y animes en Español Latino, Castellano y Subtitulado en Dooplex.',
+  referrer: 'no-referrer',
 };
 
 export default function RootLayout({
@@ -16,6 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className="dark">
+      <head>
+        <meta name="referrer" content="no-referrer" />
+      </head>
       <body className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 antialiased selection:bg-red-600 selection:text-white">
         <Navbar />
         <main className="flex-1">{children}</main>

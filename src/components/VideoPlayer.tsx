@@ -243,6 +243,18 @@ export default function VideoPlayer({
       return;
     }
 
+    // Asegurar meta referrer="no-referrer" en el DOM para que las peticiones XHR de Hls.js hacia strm*.uqload.vc
+    // no envíen cabecera Referer de otro dominio (lo cual activaba el video de bloqueo de Uqload)
+    let metaRef = document.querySelector(
+      'meta[name="referrer"]'
+    ) as HTMLMetaElement | null;
+    if (!metaRef) {
+      metaRef = document.createElement('meta');
+      metaRef.name = 'referrer';
+      document.head.appendChild(metaRef);
+    }
+    metaRef.content = 'no-referrer';
+
     const videoEl = videoRef.current;
     let hls: Hls | null = null;
 
