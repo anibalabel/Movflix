@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Lock,
@@ -13,22 +13,6 @@ import {
   KeyRound,
   ArrowLeft,
 } from 'lucide-react';
-
-declare global {
-  interface Window {
-    google?: {
-      accounts?: {
-        oauth2?: {
-          initTokenClient: (config: {
-            client_id: string;
-            scope: string;
-            callback: (response: { access_token?: string; error?: string }) => void;
-          }) => { requestAccessToken: (overrideConfig?: { prompt?: string }) => void };
-        };
-      };
-    };
-  }
-}
 
 export interface AuthUser {
   id: number;
@@ -62,92 +46,16 @@ export default function LoginModal({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState(
-    '946966649680-sobqbid2jil433jlilgiknb2kjulu00d.apps.googleusercontent.com'
-  );
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    // Obtener client_id de la configuración del servidor
-    fetch('/api/auth/google')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.google_client_id) {
-          setGoogleClientId(data.google_client_id);
-        }
-      })
-      .catch(() => {});
-
-    // Cargar Google Identity Services script si no existe
-    if (!document.getElementById('google-gsi-script')) {
-      const script = document.createElement('script');
-      script.id = 'google-gsi-script';
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleGoogleLogin = () => {
     setError('');
     setSuccessMsg('');
-
-    if (!window.google?.accounts?.oauth2) {
-      setError('Cargando servicios de Google, intenta de nuevo en un segundo.');
-      return;
-    }
-
     setGoogleLoading(true);
-    try {
-      const tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: googleClientId,
-        scope: 'openid email profile',
-        callback: async (tokenResponse) => {
-          if (tokenResponse.error || !tokenResponse.access_token) {
-            setGoogleLoading(false);
-            if (tokenResponse.error !== 'popup_closed_by_user') {
-              setError('No se pudo completar el inicio de sesión con Google.');
-            }
-            return;
-          }
-
-          try {
-            const res = await fetch('/api/auth/google', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ access_token: tokenResponse.access_token }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.data) {
-              setError(
-                data.message ||
-                  (data.error === 'email_required'
-                    ? 'El correo de Google es obligatorio (email_required)'
-                    : 'Error al autenticar con Google')
-              );
-            } else {
-              onSuccess(data.data);
-              onClose();
-            }
-          } catch {
-            setError('Error de conexión al validar tu cuenta de Google');
-          } finally {
-            setGoogleLoading(false);
-          }
-        },
-      });
-
-      tokenClient.requestAccessToken({ prompt: 'select_account' });
-    } catch {
-      setGoogleLoading(false);
-      setError('No se pudo abrir la ventana de Google Sign-In.');
-    }
+    window.location.href = '/api/auth/google?redirect=1';
   };
 
   const switchMode = (newMode: 'login' | 'register' | 'forgot') => {

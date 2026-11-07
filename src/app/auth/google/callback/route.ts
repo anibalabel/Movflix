@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withDb } from '@/lib/db';
 import {
+  WEB_GOOGLE_REDIRECT_URI,
   getGoogleSettings,
   resolveGooglePayload,
   upsertGoogleUser,
@@ -27,17 +28,13 @@ export async function GET(request: NextRequest) {
   try {
     return await withDb(async (conn) => {
       const settings = await getGoogleSettings(conn);
-      const currentCallbackUri = `${request.nextUrl.origin}/auth/google/callback`;
 
       const googleData = await resolveGooglePayload(
         {
           code: code || undefined,
           access_token: accessTokenParam || undefined,
           id_token: idTokenParam || undefined,
-          redirect_uri:
-            request.nextUrl.searchParams.get('redirect_uri') ||
-            settings.google_redirect_uri ||
-            currentCallbackUri,
+          redirect_uri: WEB_GOOGLE_REDIRECT_URI,
         },
         settings
       );

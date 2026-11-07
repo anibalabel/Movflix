@@ -10,6 +10,9 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Connection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
+export const WEB_GOOGLE_REDIRECT_URI =
+  process.env.GOOGLE_REDIRECT_URI || 'https://docines.us/auth/google/callback';
+
 export interface GoogleSettings {
   google_client_id: string;
   google_client_secret: string;
@@ -17,8 +20,10 @@ export interface GoogleSettings {
 }
 
 export async function getGoogleSettings(conn: Connection): Promise<GoogleSettings> {
+  // Solo leemos google_client_id y google_client_secret de `settings`
+  // porque google_redirect_uri en `settings` pertenece al Admin Panel en otro dominio
   const [rows] = await conn.query<RowDataPacket[]>(
-    'SELECT google_client_id, google_client_secret, google_redirect_uri FROM settings LIMIT 1'
+    'SELECT google_client_id, google_client_secret FROM settings LIMIT 1'
   );
   const row = rows?.[0] || {};
   return {
@@ -26,9 +31,7 @@ export async function getGoogleSettings(conn: Connection): Promise<GoogleSetting
     google_client_secret: String(
       row.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || ''
     ).trim(),
-    google_redirect_uri: String(
-      row.google_redirect_uri || process.env.GOOGLE_REDIRECT_URI || ''
-    ).trim(),
+    google_redirect_uri: WEB_GOOGLE_REDIRECT_URI,
   };
 }
 
@@ -291,12 +294,14 @@ export async function GET(request: NextRequest) {
       if (shouldRedirect) {
         const callbackUrl =
           request.nextUrl.searchParams.get('redirect_uri') ||
-          `${request.nextUrl.origin}/auth/google/callback`;
+          settings.google_redirect_uri ||
+          'https://docines.us/auth/google/callback';
         const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         authUrl.searchParams.set('client_id', settings.google_client_id);
         authUrl.searchParams.set('redirect_uri', callbackUrl);
         authUrl.searchParams.set('response_type', 'code');
         authUrl.searchParams.set('scope', 'openid email profile');
+        authUrl.searchParams.set('access_type', 'online');
         authUrl.searchParams.set('prompt', 'select_account');
         return NextResponse.redirect(authUrl.toString());
       }
