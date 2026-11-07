@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { withDb, normalizeImageUrl, isDatabaseConfigured } from '@/lib/db';
+import { withDb, normalizeImageUrl, isDatabaseConfiguredAsync } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 
 export async function GET() {
-  if (!isDatabaseConfigured()) {
+  if (!(await isDatabaseConfiguredAsync())) {
     return NextResponse.json(
       {
         success: false,

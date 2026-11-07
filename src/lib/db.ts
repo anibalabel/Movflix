@@ -2,7 +2,11 @@ import mysql, { Connection, RowDataPacket, ResultSetHeader, FieldPacket } from '
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
+
+export const DB_CONFIG_COOKIE_NAME = 'dooplex_db_cfg';
+const EDGE_CACHE_CONFIG_URL = 'https://dooplex-internal.local/_db_config_v1';
 
 export interface DbConnectionParams {
   host: string;
@@ -14,6 +18,93 @@ export interface DbConnectionParams {
 
 declare global {
   var __DOOPLEX_DB_CONFIG: DbConnectionParams | undefined;
+}
+
+function getEncryptionKey(): Buffer {
+  const secret = process.env.JWT_SECRET || 'dooplex-installer-aes-secret-key-2026';
+  return crypto.createHash('sha256').update(secret).digest();
+}
+
+export function encryptDbConfig(cfg: DbConnectionParams): string {
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const plaintext = JSON.stringify({
+    host: cfg.host.trim(),
+    port: Number(cfg.port) || 3306,
+    user: cfg.user.trim(),
+    password: cfg.password ?? '',
+    database: cfg.database.trim(),
+  });
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString('base64url')}.${tag.toString('base64url')}.${encrypted.toString('base64url')}`;
+}
+
+export function decryptDbConfig(token: string): DbConnectionParams | null {
+  try {
+    const parts = (token || '').trim().split('.');
+    if (parts.length !== 3) return null;
+    const [ivB64, tagB64, dataB64] = parts;
+    const key = getEncryptionKey();
+    const iv = Buffer.from(ivB64, 'base64url');
+    const tag = Buffer.from(tagB64, 'base64url');
+    const encrypted = Buffer.from(dataB64, 'base64url');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+    const parsed = JSON.parse(decrypted);
+    if (parsed && parsed.host && parsed.database && parsed.user) {
+      return {
+        host: String(parsed.host).trim(),
+        port: Number(parsed.port) || 3306,
+        user: String(parsed.user).trim(),
+        password: String(parsed.password ?? ''),
+        database: String(parsed.database).trim(),
+      };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function writeToEdgeCache(encryptedToken: string): Promise<boolean> {
+  try {
+    const cacheStorage = (globalThis as unknown as { caches?: { default?: Cache } }).caches;
+    if (cacheStorage?.default) {
+      const req = new Request(EDGE_CACHE_CONFIG_URL, { method: 'GET' });
+      const res = new Response(encryptedToken, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'public, max-age=31536000, s-maxage=31536000',
+        },
+      });
+      await cacheStorage.default.put(req, res);
+      return true;
+    }
+  } catch {
+    // Ignore if Cache API is not available in current runtime
+  }
+  return false;
+}
+
+async function readFromEdgeCache(): Promise<string | null> {
+  try {
+    const cacheStorage = (globalThis as unknown as { caches?: { default?: Cache } }).caches;
+    if (cacheStorage?.default) {
+      const req = new Request(EDGE_CACHE_CONFIG_URL, { method: 'GET' });
+      const match = await cacheStorage.default.match(req);
+      if (match && match.ok) {
+        const text = (await match.text()).trim();
+        if (text) return text;
+      }
+    }
+  } catch {
+    // Ignore if Cache API is not available
+  }
+  return null;
 }
 
 function readLocalConfigFile(): Partial<DbConnectionParams> | null {
@@ -40,7 +131,7 @@ function readLocalConfigFile(): Partial<DbConnectionParams> | null {
 
 export function getResolvedDbConfig(): DbConnectionParams & {
   isConfigured: boolean;
-  source: 'runtime' | 'file' | 'env' | 'none';
+  source: 'runtime' | 'file' | 'cookie' | 'edge-cache' | 'env' | 'none';
 } {
   // 1. In-memory runtime config set during current session
   if (
@@ -104,11 +195,70 @@ export function getResolvedDbConfig(): DbConnectionParams & {
   };
 }
 
+export async function getResolvedDbConfigAsync(): Promise<
+  DbConnectionParams & {
+    isConfigured: boolean;
+    source: 'runtime' | 'file' | 'cookie' | 'edge-cache' | 'env' | 'none';
+  }
+> {
+  // 1. Check synchronous sources first (runtime memory or .db-config.json)
+  const syncCfg = getResolvedDbConfig();
+  if (syncCfg.isConfigured && (syncCfg.source === 'runtime' || syncCfg.source === 'file')) {
+    return syncCfg;
+  }
+
+  // 2. Check Encrypted HttpOnly Cookie (works across all serverless/Cloudflare isolates)
+  try {
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get(DB_CONFIG_COOKIE_NAME)?.value;
+    if (cookieToken) {
+      const decrypted = decryptDbConfig(cookieToken);
+      if (decrypted) {
+        globalThis.__DOOPLEX_DB_CONFIG = decrypted;
+        await writeToEdgeCache(cookieToken);
+        return {
+          ...decrypted,
+          isConfigured: true,
+          source: 'cookie',
+        };
+      }
+    }
+  } catch {
+    // Ignore if called outside request context
+  }
+
+  // 3. Check Cloudflare Edge Cache (shares config with all visitors across Worker isolates)
+  const edgeToken = await readFromEdgeCache();
+  if (edgeToken) {
+    const decrypted = decryptDbConfig(edgeToken);
+    if (decrypted) {
+      globalThis.__DOOPLEX_DB_CONFIG = decrypted;
+      return {
+        ...decrypted,
+        isConfigured: true,
+        source: 'edge-cache',
+      };
+    }
+  }
+
+  // 4. Fallback to env vars (.env.local / Cloudflare env)
+  return syncCfg;
+}
+
 export function isDatabaseConfigured(): boolean {
   return getResolvedDbConfig().isConfigured;
 }
 
-export function saveDbConfig(params: DbConnectionParams): { savedToFile: boolean; savedToEnv: boolean } {
+export async function isDatabaseConfiguredAsync(): Promise<boolean> {
+  const cfg = await getResolvedDbConfigAsync();
+  return cfg.isConfigured;
+}
+
+export async function saveDbConfig(params: DbConnectionParams): Promise<{
+  encryptedToken: string;
+  savedToFile: boolean;
+  savedToEdgeCache: boolean;
+}> {
   const clean: DbConnectionParams = {
     host: params.host.trim(),
     port: Number(params.port) || 3306,
@@ -124,9 +274,10 @@ export function saveDbConfig(params: DbConnectionParams): { savedToFile: boolean
   process.env.DB_USERNAME = clean.user;
   process.env.DB_PASSWORD = clean.password;
 
-  let savedToFile = false;
-  let savedToEnv = false;
+  const encryptedToken = encryptDbConfig(clean);
+  const savedToEdgeCache = await writeToEdgeCache(encryptedToken);
 
+  let savedToFile = false;
   try {
     const jsonPath = path.join(process.cwd(), '.db-config.json');
     fs.writeFileSync(
@@ -143,45 +294,10 @@ export function saveDbConfig(params: DbConnectionParams): { savedToFile: boolean
     );
     savedToFile = true;
   } catch {
-    // Ignore if read-only filesystem
+    // Read-only filesystem (e.g. Cloudflare Workers / Serverless) - cookie & edge cache handle persistence
   }
 
-  try {
-    const envPath = path.join(process.cwd(), '.env.local');
-    let existingLines: string[] = [];
-    if (fs.existsSync(envPath)) {
-      existingLines = fs
-        .readFileSync(envPath, 'utf8')
-        .split(/\r?\n/)
-        .filter(
-          (line) =>
-            !line.startsWith('DB_CONNECTION=') &&
-            !line.startsWith('DB_HOST=') &&
-            !line.startsWith('DB_PORT=') &&
-            !line.startsWith('DB_DATABASE=') &&
-            !line.startsWith('DB_USERNAME=') &&
-            !line.startsWith('DB_PASSWORD=') &&
-            !line.startsWith('DB_CHARSET=')
-        );
-    }
-    const escapedPass = clean.password.replace(/"/g, '\\"');
-    const dbLines = [
-      'DB_CONNECTION=mysql',
-      `DB_HOST=${clean.host}`,
-      `DB_PORT=${clean.port}`,
-      `DB_DATABASE=${clean.database}`,
-      `DB_USERNAME=${clean.user}`,
-      `DB_PASSWORD="${escapedPass}"`,
-      'DB_CHARSET=utf8mb4',
-    ];
-    const finalContent = [...dbLines, ...existingLines.filter(Boolean)].join('\n') + '\n';
-    fs.writeFileSync(envPath, finalContent, 'utf8');
-    savedToEnv = true;
-  } catch {
-    // Ignore if read-only filesystem
-  }
-
-  return { savedToFile, savedToEnv };
+  return { encryptedToken, savedToFile, savedToEdgeCache };
 }
 
 export async function createCustomDbConnection(params: DbConnectionParams): Promise<Connection> {
@@ -290,7 +406,7 @@ export function getSessionUserFromRequest(request: NextRequest): SessionUserPayl
 }
 
 export async function createDbConnection(): Promise<Connection> {
-  const cfg = getResolvedDbConfig();
+  const cfg = await getResolvedDbConfigAsync();
   if (!cfg.isConfigured) {
     throw new Error(
       'DB_NOT_CONFIGURED: La base de datos no está configurada. Completa la instalación en /setup.'

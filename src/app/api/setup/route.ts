@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getResolvedDbConfig,
+  DB_CONFIG_COOKIE_NAME,
+  getResolvedDbConfigAsync,
   saveDbConfig,
+  encryptDbConfig,
   createCustomDbConnection,
   getSessionUserFromRequest,
   withDb,
@@ -17,7 +19,7 @@ function maskString(value: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const cfg = getResolvedDbConfig();
+  const cfg = await getResolvedDbConfigAsync();
   const sessionUser = getSessionUserFromRequest(request);
   const isAdmin = sessionUser?.role === 'admin';
 
@@ -58,7 +60,7 @@ export async function GET(request: NextRequest) {
     connectionError = err instanceof Error ? err.message : 'No se pudo conectar a la base de datos';
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     installed: true,
     connected,
     connectionError,
@@ -73,6 +75,20 @@ export async function GET(request: NextRequest) {
     },
     stats,
   });
+
+  // Asegurar que la cookie cifrada esté sincronizada si la conexión está activa
+  if (connected && !request.cookies.get(DB_CONFIG_COOKIE_NAME)?.value) {
+    const token = encryptDbConfig(cfg);
+    response.cookies.set(DB_CONFIG_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
+  return response;
 }
 
 export async function POST(request: NextRequest) {
@@ -97,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Si el sistema ya está instalado y conectado, verificar autorización antes de sobrescribir
-    const existing = getResolvedDbConfig();
+    const existing = await getResolvedDbConfigAsync();
     const sessionUser = getSessionUserFromRequest(request);
     const isAdmin = sessionUser?.role === 'admin';
 
@@ -178,8 +194,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Guardar configuración
-    const saveResult = saveDbConfig({
+    // Guardar configuración (memoria + archivo local + caché de borde + cookie cifrada AES-256-GCM)
+    const saveResult = await saveDbConfig({
       host,
       port,
       user: username,
@@ -187,16 +203,26 @@ export async function POST(request: NextRequest) {
       database,
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       mode: 'save',
       message: '¡Configuración de base de datos guardada e instalada correctamente!',
       savedToFile: saveResult.savedToFile,
-      savedToEnv: saveResult.savedToEnv,
+      savedToEdgeCache: saveResult.savedToEdgeCache,
       tablesCount: existingTables.length,
       missingCoreTables,
       stats,
     });
+
+    response.cookies.set(DB_CONFIG_COOKIE_NAME, saveResult.encryptedToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365, // 1 año
+    });
+
+    return response;
   } catch (error: unknown) {
     console.error('Error in POST /api/setup:', error);
     const rawMsg = error instanceof Error ? error.message : 'Error al conectar con MySQL';
@@ -209,4 +235,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

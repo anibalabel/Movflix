@@ -27,7 +27,7 @@ interface SetupStatusResponse {
   installed: boolean;
   connected: boolean;
   connectionError?: string | null;
-  source: 'runtime' | 'file' | 'env' | 'none';
+  source: 'runtime' | 'file' | 'cookie' | 'edge-cache' | 'env' | 'none';
   isAdmin: boolean;
   requiresUnlock?: boolean;
   currentConfig: {
@@ -143,9 +143,8 @@ export default function SetupPage() {
         await fetchStatus();
         setShowReconfigureForm(false);
         setTimeout(() => {
-          router.push('/');
-          router.refresh();
-        }, 1500);
+          window.location.href = '/';
+        }, 1200);
       }
     } catch {
       setFeedback({
