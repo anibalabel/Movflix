@@ -181,30 +181,45 @@ export default function CommentsSection({
         </div>
       )}
 
-      {/* New Comment Form */}
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <textarea
-          rows={3}
-          maxLength={1000}
-          value={commentText}
-          onChange={(e) => setCommentText(e.target.value)}
-          placeholder="Escribe tu comentario sobre este título (máx. 1000 caracteres)..."
-          className="w-full px-4 py-3 rounded-2xl bg-zinc-950 border border-zinc-800 text-white text-sm focus:outline-none focus:border-red-500 transition resize-none"
-        />
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500">
-            {commentText.length} / 1000 caracteres
-          </span>
+      {/* New Comment Form (Only for Registered / Logged-in Users) */}
+      {currentUserId ? (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <textarea
+            rows={3}
+            maxLength={1000}
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Escribe tu comentario sobre este título (máx. 1000 caracteres)..."
+            className="w-full px-4 py-3 rounded-2xl bg-zinc-950 border border-zinc-800 text-white text-sm focus:outline-none focus:border-red-500 transition resize-none"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-zinc-500">
+              {commentText.length} / 1000 caracteres
+            </span>
+            <button
+              type="submit"
+              disabled={submitting || !commentText.trim()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-lg shadow-red-600/20 transition cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+              <span>{submitting ? 'Publicando...' : 'Publicar Comentario'}</span>
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="p-4 rounded-2xl bg-zinc-950/90 border border-zinc-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-xs sm:text-sm text-zinc-300">
+            Debes <strong>iniciar sesión</strong> con tu cuenta (Correo o Google) para publicar comentarios y dar <em>Me gusta / No me gusta</em>.
+          </p>
           <button
-            type="submit"
-            disabled={submitting || !commentText.trim()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-lg shadow-red-600/20 transition cursor-pointer"
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition shrink-0 cursor-pointer"
           >
-            <Send className="w-4 h-4" />
-            <span>{submitting ? 'Publicando...' : 'Publicar Comentario'}</span>
+            Acceder arriba
           </button>
         </div>
-      </form>
+      )}
 
       {/* Comments List */}
       {loading ? (
