@@ -23,6 +23,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -32,6 +33,7 @@ export default function Navbar() {
       .then((d) => {
         if (d.authenticated && d.user) {
           setUser(d.user);
+          setAvatarError(false);
         }
       })
       .catch(() => {});
@@ -136,16 +138,24 @@ export default function Navbar() {
             </form>
 
             {user ? (
-              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-full pl-3 pr-1.5 py-1">
+              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-full pl-1.5 pr-1.5 py-1">
                 <Link
                   href="/dashboard"
                   title="Ir a mi Panel y Favoritos"
-                  className="flex items-center gap-1.5 hover:opacity-85 transition pr-1"
+                  className="flex items-center gap-2 hover:opacity-85 transition pr-1"
                 >
-                  {user.role === 'admin' ? (
-                    <ShieldCheck className="w-4 h-4 text-red-500" />
+                  {user.avatar && !avatarError ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      referrerPolicy="no-referrer"
+                      onError={() => setAvatarError(true)}
+                      className="w-7 h-7 rounded-full object-cover border border-zinc-700"
+                    />
                   ) : (
-                    <User className="w-4 h-4 text-rose-400" />
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center text-white text-xs font-bold">
+                      {String(user.name || 'U').charAt(0).toUpperCase()}
+                    </div>
                   )}
                   <span className="text-xs font-semibold text-zinc-200 max-w-[110px] truncate">
                     {user.name}

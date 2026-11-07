@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withDb } from '@/lib/db';
+import { withDb, DEFAULT_AVATAR_PATH, createAccessToken } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
       const phpCompatibleHash = rawHash.replace(/^\$2[ab]\$/, '$2y$');
 
       const [result] = await conn.query<ResultSetHeader>(
-        `INSERT INTO users (role, name, email, password, premuim, verified, verfied, active, last_login_at, created_at, updated_at)
-         VALUES ('user', ?, ?, ?, 0, 1, 1, 1, NOW(), NOW(), NOW())`,
-        [name, email, phpCompatibleHash]
+        `INSERT INTO users (role, name, email, password, avatar, premuim, verified, verfied, active, email_verified_at, last_login_at, created_at, updated_at)
+         VALUES ('user', ?, ?, ?, ?, 0, 1, 1, 1, NOW(), NOW(), NOW(), NOW())`,
+        [name, email, phpCompatibleHash, DEFAULT_AVATAR_PATH]
       );
 
       const userData = {
@@ -64,12 +64,29 @@ export async function POST(request: NextRequest) {
         email,
         role: 'user',
         premium: false,
-        avatar: null,
+        avatar: DEFAULT_AVATAR_PATH,
+        provider_name: null,
       };
+
+      const expiresIn = 31536000;
+      const accessToken = createAccessToken(
+        {
+          sub: userData.id,
+          email: userData.email,
+          name: userData.name,
+          role: userData.role,
+        },
+        expiresIn
+      );
 
       const response = NextResponse.json({
         success: true,
         message: 'Cuenta creada exitosamente',
+        token_type: 'Bearer',
+        expires_in: expiresIn,
+        access_token: accessToken,
+        refresh_token: null,
+        type: 'local',
         data: userData,
       });
 

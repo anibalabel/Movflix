@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withDb, normalizeImageUrl } from '@/lib/db';
+import { withDb, normalizeImageUrl, normalizeAvatarUrl } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 
 function getSessionUser(request: NextRequest): { id: number; name: string; email: string; role: string } | null {
@@ -29,6 +29,25 @@ export async function GET(request: NextRequest) {
 
   try {
     return await withDb(async (conn) => {
+      // Consultar el perfil actualizado del usuario incluyendo la columna `avatar` y `provider_name`
+      const [userRows] = await conn.query<RowDataPacket[]>(
+        'SELECT id, name, email, role, premuim, avatar, provider_name FROM users WHERE id = ? LIMIT 1',
+        [user.id]
+      );
+      const dbUser = userRows[0];
+      const fullUser = dbUser
+        ? {
+            id: Number(dbUser.id),
+            username: dbUser.name || dbUser.email,
+            name: dbUser.name || dbUser.email,
+            email: dbUser.email,
+            role: dbUser.role || 'user',
+            premium: Boolean(dbUser.premuim),
+            avatar: dbUser.avatar ? normalizeAvatarUrl(dbUser.avatar) : null,
+            provider_name: dbUser.provider_name || null,
+          }
+        : user;
+
       const [favRows] = await conn.query<RowDataPacket[]>(
         `SELECT user_id, favoriteable_type, favoriteable_id, created_at
          FROM favorites
@@ -130,7 +149,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        user,
+        user: fullUser,
         total: items.length,
         data: items,
       });

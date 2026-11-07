@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pool } from '@/lib/db';
+import { withDb } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,9 +22,11 @@ export async function POST(request: NextRequest) {
     const reportTitle = `[Web - ${subject}] ${name} <${email}>`.slice(0, 190);
     const reportMessage = message.slice(0, 190);
 
-    await pool.query(
-      'INSERT INTO reports (title, message, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
-      [reportTitle, reportMessage]
+    await withDb((conn) =>
+      conn.query(
+        'INSERT INTO reports (title, message, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
+        [reportTitle, reportMessage]
+      )
     );
 
     return NextResponse.json({
