@@ -39,6 +39,14 @@ export default function Navbar() {
       .catch(() => {});
   }, [pathname]);
 
+  useEffect(() => {
+    const openLoginHandler = () => setLoginOpen(true);
+    window.addEventListener('dooplex-open-login', openLoginHandler);
+    return () => {
+      window.removeEventListener('dooplex-open-login', openLoginHandler);
+    };
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchQuery.trim();
@@ -248,7 +256,9 @@ export default function Navbar() {
           setUser(loggedUser);
           setAvatarError(false);
           window.dispatchEvent(new Event('dooplex-auth-changed'));
-          router.push('/dashboard');
+          if (!pathname.startsWith('/watch')) {
+            router.push('/dashboard');
+          }
         }}
       />
     </>

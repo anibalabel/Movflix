@@ -20,10 +20,19 @@ export interface NormalizedVideoLink extends RawVideoLink {
   langLabel: string;
   langFlag: string;
   serverLabel: string;
-  playerType: 'vidara' | 'streamwish' | 'hls' | 'mp4' | 'youtube' | 'embed';
+  playerType:
+    | 'vidara'
+    | 'streamwish'
+    | 'uqload'
+    | 'hls'
+    | 'mp4'
+    | 'youtube'
+    | 'embed';
   playbackUrl: string;
   vidaraFilecode: string | null;
   streamwishFilecode: string | null;
+  uqloadFilecode: string | null;
+  requiresAuth: boolean;
 }
 
 const STREAMWISH_HOST_KEYWORDS = [
@@ -276,6 +285,37 @@ export function extractStreamWishFilecode(
 }
 
 /**
+ * Extrae el filecode de Uqload (ej. https://uqload.is/embed-ech9olnz8v3i.html o https://uqload.vc/e/gp47l81u4694 -> "ech9olnz8v3i")
+ */
+export function extractUqloadFilecode(
+  link: string,
+  rawServer?: string | null,
+  rawHeader?: string | null
+): string | null {
+  const trimmed = (link || '').trim();
+  if (!trimmed) return null;
+
+  const combined = `${rawServer || ''} ${rawHeader || ''} ${trimmed}`.toLowerCase();
+  if (!combined.includes('uqload')) {
+    return null;
+  }
+
+  const match = trimmed.match(
+    /(?:embed-|\/(?:e|v|d|embed)\/)([a-zA-Z0-9_-]+)/i
+  );
+  if (match && match[1]) {
+    return match[1];
+  }
+
+  const htmlMatch = trimmed.match(/\/([a-zA-Z0-9_-]+)\.html/i);
+  if (htmlMatch && htmlMatch[1]) {
+    return htmlMatch[1].replace(/^embed-/i, '');
+  }
+
+  return null;
+}
+
+/**
  * Normaliza enlaces de servidores embed como Vidara que en la BD vienen con `/v/`
  * (ej. https://vidara.so/v/qo1LOLLEEEw3i -> https://vidara.so/e/qo1LOLLEEEw3i)
  */
@@ -291,6 +331,18 @@ export function normalizeEmbedPlaybackUrl(
     return link.replace(/\/v\/([^/?#]+)/i, '/e/$1');
   }
 
+  // Si es un dominio espejo de StreamWish en modo embed, normalizar a streamwish.fun/e/{code}
+  const swCode = extractStreamWishFilecode(link, rawServer, rawHeader);
+  if (swCode) {
+    return `https://streamwish.fun/e/${swCode}`;
+  }
+
+  // Si es un enlace antiguo de Uqload (/embed-{code}.html), normalizar a https://uqload.vc/e/{code}
+  const uqCode = extractUqloadFilecode(link, rawServer, rawHeader);
+  if (uqCode) {
+    return `https://uqload.vc/e/${uqCode}`;
+  }
+
   return link;
 }
 
@@ -299,6 +351,11 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
   const link = normalizeEmbedPlaybackUrl(rawLink, video.server, video.header);
   const vidaraFilecode = extractVidaraFilecode(rawLink);
   const streamwishFilecode = extractStreamWishFilecode(
+    rawLink,
+    video.server,
+    video.header
+  );
+  const uqloadFilecode = extractUqloadFilecode(
     rawLink,
     video.server,
     video.header
@@ -321,18 +378,32 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     !lowerLink.includes('/e/') &&
     !lowerLink.includes('/embed');
 
-  let playerType: 'vidara' | 'streamwish' | 'hls' | 'mp4' | 'youtube' | 'embed' =
-    'embed';
+  let playerType:
+    | 'vidara'
+    | 'streamwish'
+    | 'uqload'
+    | 'hls'
+    | 'mp4'
+    | 'youtube'
+    | 'embed' = 'embed';
   let playbackUrl = link;
 
-  // Rule 0a: Vidara Direct Stream API (POST https://vidara.so/api/stream)
-  if (vidaraFilecode) {
-    playerType = 'vidara';
-  }
-  // Rule 0b: StreamWish Direct HLS Extractor (/api/streamwish)
-  else if (streamwishFilecode) {
-    playerType = 'streamwish';
-    playbackUrl = `https://streamwish.fun/e/${streamwishFilecode}`;
+  // Regla principal de `supported_hosts`:
+  // Solo si `supported_hosts == 1` está activo intentamos usar los extractores propios implementados (Vidara, StreamWish y Uqload).
+  // Si `supported_hosts == 1` está activo pero aún no existe extractor para ese servidor (ej. Doodstream, MixDrop, DropLoad, EarnVids),
+  // se queda en `embed` hasta que se incorpore su extractor.
+  if (isSupportedHostFlag) {
+    if (vidaraFilecode) {
+      playerType = 'vidara';
+    } else if (streamwishFilecode) {
+      playerType = 'streamwish';
+      playbackUrl = `https://streamwish.fun/e/${streamwishFilecode}`;
+    } else if (uqloadFilecode) {
+      playerType = 'uqload';
+      playbackUrl = `https://uqload.vc/e/${uqloadFilecode}`;
+    } else {
+      playerType = 'embed';
+    }
   }
   // Rule 1: HLS (.m3u8 or hls == 1 when not a direct .mp4 file)
   else if (lowerLink.includes('.m3u8') || (isHlsFlag && !isDirectVideoFile)) {
@@ -351,7 +422,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
   else if (!isEmbedFlag && !isSupportedHostFlag && isDirectVideoFile) {
     playerType = 'mp4';
   }
-  // Rule 4: Default / embed == 1 or supported_hosts == 1
+  // Rule 4: Default / embed == 1
   else {
     playerType = 'embed';
   }
@@ -366,5 +437,8 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     playbackUrl,
     vidaraFilecode,
     streamwishFilecode,
+    uqloadFilecode,
+    // Los videos con `supported_hosts == 1` requieren que el usuario esté registrado y logueado
+    requiresAuth: isSupportedHostFlag,
   };
 }

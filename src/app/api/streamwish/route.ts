@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSessionUserFromRequest } from '@/lib/db';
 
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -187,6 +188,19 @@ export async function resolveStreamWishUrl(
 }
 
 export async function GET(request: NextRequest) {
+  const sessionUser = getSessionUserFromRequest(request);
+  if (!sessionUser || !sessionUser.id) {
+    return NextResponse.json(
+      {
+        success: false,
+        requiresAuth: true,
+        error:
+          'Debes iniciar sesión con tu cuenta para reproducir servidores en Stream Directo (Sin Anuncios).',
+      },
+      { status: 401 }
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const rawUrl = (searchParams.get('url') || '').trim();
@@ -220,6 +234,19 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const sessionUser = getSessionUserFromRequest(request);
+  if (!sessionUser || !sessionUser.id) {
+    return NextResponse.json(
+      {
+        success: false,
+        requiresAuth: true,
+        error:
+          'Debes iniciar sesión con tu cuenta para reproducir servidores en Stream Directo (Sin Anuncios).',
+      },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await request.json();
     const rawUrl = String(body.url || '').trim();

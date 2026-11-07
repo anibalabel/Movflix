@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Maximize2,
   Minimize2,
+  Lock,
+  LogIn,
 } from 'lucide-react';
 
 interface VideoPlayerProps {
@@ -50,10 +52,27 @@ export default function VideoPlayer({
   const [theaterMode, setTheaterMode] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
 
-  // State for Vidara Direct Stream API (/api/vidara)
+  // State for Vidara / StreamWish Direct Stream API (/api/vidara & /api/streamwish)
   const [vidaraInfo, setVidaraInfo] = useState<VidaraStreamInfo | null>(null);
   const [vidaraLoading, setVidaraLoading] = useState(false);
   const [vidaraStarted, setVidaraStarted] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkAuth = () => {
+      fetch('/api/auth/me')
+        .then((r) => r.json())
+        .then((d) => {
+          setIsAuthenticated(Boolean(d?.authenticated && d?.user?.id));
+        })
+        .catch(() => {});
+    };
+    checkAuth();
+    window.addEventListener('dooplex-auth-changed', checkAuth);
+    return () => {
+      window.removeEventListener('dooplex-auth-changed', checkAuth);
+    };
+  }, []);
 
   // Group videos by language code
   const groupedByLang = useMemo(() => {
@@ -109,15 +128,22 @@ export default function VideoPlayer({
     );
   }, [currentLangVideos, selectedVideoId]);
 
-  // Resolve Vidara or StreamWish direct streaming_url and thumbnail when activeVideo is 'vidara' or 'streamwish'
+  // Resolve Vidara, StreamWish or Uqload direct streaming_url and thumbnail when activeVideo is 'vidara', 'streamwish' or 'uqload'
   useEffect(() => {
     const isVidara =
       activeVideo?.playerType === 'vidara' && Boolean(activeVideo?.vidaraFilecode);
     const isStreamWish =
       activeVideo?.playerType === 'streamwish' &&
       Boolean(activeVideo?.streamwishFilecode);
+    const isUqload =
+      activeVideo?.playerType === 'uqload' &&
+      Boolean(activeVideo?.uqloadFilecode);
 
-    if (!activeVideo || (!isVidara && !isStreamWish)) {
+    if (
+      !activeVideo ||
+      (!isVidara && !isStreamWish && !isUqload) ||
+      (activeVideo.requiresAuth && !isAuthenticated)
+    ) {
       setVidaraInfo(null);
       setVidaraLoading(false);
       setVidaraStarted(false);
@@ -129,17 +155,23 @@ export default function VideoPlayer({
     setVidaraStarted(false);
     setVidaraInfo(null);
 
-    const endpoint = isVidara ? '/api/vidara' : '/api/streamwish';
-    const payload = isVidara
-      ? { filecode: activeVideo.vidaraFilecode }
-      : {
-          filecode: activeVideo.streamwishFilecode,
-          url: activeVideo.playbackUrl,
-        };
+    const endpoint = isVidara
+      ? '/api/vidara'
+      : isStreamWish
+      ? '/api/streamwish'
+      : '/api/uqload';
     const filecode =
       (isVidara
         ? activeVideo.vidaraFilecode
-        : activeVideo.streamwishFilecode) || '';
+        : isStreamWish
+        ? activeVideo.streamwishFilecode
+        : activeVideo.uqloadFilecode) || '';
+    const payload = isVidara
+      ? { filecode }
+      : {
+          filecode,
+          url: activeVideo.playbackUrl,
+        };
 
     fetch(endpoint, {
       method: 'POST',
@@ -184,9 +216,9 @@ export default function VideoPlayer({
     return () => {
       cancelled = true;
     };
-  }, [activeVideo, iframeKey]);
+  }, [activeVideo, iframeKey, isAuthenticated]);
 
-  // Determine effective HLS URL (standard HLS server OR Vidara / StreamWish direct m3u8 once user clicks Play)
+  // Determine effective HLS URL (standard HLS server OR Vidara / StreamWish / Uqload direct m3u8 once user clicks Play)
   const effectiveHlsUrl = useMemo(() => {
     if (!activeVideo) return null;
     if (activeVideo.playerType === 'hls') {
@@ -194,7 +226,8 @@ export default function VideoPlayer({
     }
     if (
       (activeVideo.playerType === 'vidara' ||
-        activeVideo.playerType === 'streamwish') &&
+        activeVideo.playerType === 'streamwish' ||
+        activeVideo.playerType === 'uqload') &&
       vidaraStarted &&
       vidaraInfo?.streaming_url &&
       vidaraInfo.streaming_url.toLowerCase().includes('.m3u8')
@@ -418,22 +451,28 @@ export default function VideoPlayer({
                   </span>
                 )}
                 <span
-                  className={`text-[10px] uppercase px-1.5 py-0.2 rounded ${
+                  className={`inline-flex items-center gap-1 text-[10px] uppercase px-1.5 py-0.2 rounded ${
                     isSelected
                       ? 'bg-zinc-200 text-zinc-700'
                       : 'bg-zinc-950 text-zinc-500'
                   }`}
                 >
-                  {video.playerType === 'vidara' ||
-                  video.playerType === 'streamwish'
-                    ? 'DIRECTO'
-                    : video.playerType === 'hls'
-                    ? 'HLS'
-                    : video.playerType === 'mp4'
-                    ? 'MP4'
-                    : video.playerType === 'youtube'
-                    ? 'YT'
-                    : 'EMBED'}
+                  {video.requiresAuth && !isAuthenticated && (
+                    <Lock className="w-2.5 h-2.5 text-amber-500" />
+                  )}
+                  <span>
+                    {video.playerType === 'vidara' ||
+                    video.playerType === 'streamwish' ||
+                    video.playerType === 'uqload'
+                      ? 'DIRECTO'
+                      : video.playerType === 'hls'
+                      ? 'HLS'
+                      : video.playerType === 'mp4'
+                      ? 'MP4'
+                      : video.playerType === 'youtube'
+                      ? 'YT'
+                      : 'EMBED'}
+                  </span>
                 </span>
               </button>
             );
@@ -448,10 +487,70 @@ export default function VideoPlayer({
         }`}
       >
         {activeVideo ? (
-          <>
-            {/* Mode 0: Vidara & StreamWish Direct Stream with Pre-Play Thumbnail Cover */}
+          activeVideo.requiresAuth && !isAuthenticated ? (
+            /* Auth-Gate Screen for supported_hosts == 1 when user is not logged in */
+            <div
+              className="w-full h-full relative flex flex-col items-center justify-center bg-zinc-950 p-6 text-center bg-cover bg-center"
+              style={
+                backdropUrl
+                  ? {
+                      backgroundImage: `linear-gradient(to bottom, rgba(9,9,11,0.85), rgba(9,9,11,0.96)), url(${backdropUrl})`,
+                    }
+                  : undefined
+              }
+            >
+              <div className="w-16 h-16 rounded-2xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-500 mb-4 shadow-xl">
+                <Lock className="w-8 h-8" />
+              </div>
+
+              <span className="inline-block px-3 py-1 rounded-full bg-red-600/20 border border-red-500/30 text-[11px] font-bold uppercase tracking-wider text-red-400 mb-2">
+                Exclusivo para Usuarios Registrados
+              </span>
+
+              <h3 className="text-lg sm:text-2xl font-black text-white mb-1.5">
+                Inicia sesión para reproducir en {activeVideo.serverLabel}
+              </h3>
+
+              <p className="text-xs sm:text-sm text-zinc-300 max-w-md mb-6">
+                Este servidor con extracción directa (Sin Anuncios) solo está
+                disponible para usuarios registrados y logueados en Dooplex.
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(new Event('dooplex-open-login'))
+                  }
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-red-600/30 transition cursor-pointer"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Iniciar Sesión o Registrarse Gratis</span>
+                </button>
+
+                {currentLangVideos.some((v) => !v.requiresAuth) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const freeServer = currentLangVideos.find(
+                        (v) => !v.requiresAuth
+                      );
+                      if (freeServer) setSelectedVideoId(freeServer.id);
+                    }}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs sm:text-sm font-semibold transition cursor-pointer"
+                  >
+                    <Server className="w-4 h-4 text-zinc-400" />
+                    <span>Usar otro servidor (Embed)</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Mode 0: Vidara, StreamWish & Uqload Direct Stream with Pre-Play Thumbnail Cover */}
             {(activeVideo.playerType === 'vidara' ||
-              activeVideo.playerType === 'streamwish') && (
+              activeVideo.playerType === 'streamwish' ||
+              activeVideo.playerType === 'uqload') && (
               <>
                 {vidaraLoading ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 gap-3">
@@ -567,6 +666,7 @@ export default function VideoPlayer({
               />
             )}
           </>
+          )
         ) : (
           <div className="w-full h-full flex items-center justify-center text-zinc-500">
             Selecciona un servidor para reproducir
@@ -584,7 +684,8 @@ export default function VideoPlayer({
               <strong className="text-zinc-200">{activeVideo.serverLabel}</strong> (
               {activeVideo.langFlag} {activeVideo.langLabel})
               {(activeVideo.playerType === 'vidara' ||
-                activeVideo.playerType === 'streamwish') &&
+                activeVideo.playerType === 'streamwish' ||
+                activeVideo.playerType === 'uqload') &&
                 vidaraInfo?.streaming_url && (
                   <span className="ml-2 text-emerald-400 font-semibold">
                     • Stream Directo HLS

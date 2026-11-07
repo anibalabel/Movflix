@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSessionUserFromRequest } from '@/lib/db';
 
 async function resolveVidaraStream(filecode: string) {
   const response = await fetch('https://vidara.so/api/stream', {
@@ -35,6 +36,19 @@ async function resolveVidaraStream(filecode: string) {
 }
 
 export async function GET(request: NextRequest) {
+  const sessionUser = getSessionUserFromRequest(request);
+  if (!sessionUser || !sessionUser.id) {
+    return NextResponse.json(
+      {
+        success: false,
+        requiresAuth: true,
+        error:
+          'Debes iniciar sesión con tu cuenta para reproducir servidores en Stream Directo (Sin Anuncios).',
+      },
+      { status: 401 }
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const filecode = (searchParams.get('filecode') || '').trim();
@@ -64,6 +78,19 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const sessionUser = getSessionUserFromRequest(request);
+  if (!sessionUser || !sessionUser.id) {
+    return NextResponse.json(
+      {
+        success: false,
+        requiresAuth: true,
+        error:
+          'Debes iniciar sesión con tu cuenta para reproducir servidores en Stream Directo (Sin Anuncios).',
+      },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await request.json();
     const filecode = (body.filecode || '').trim();
