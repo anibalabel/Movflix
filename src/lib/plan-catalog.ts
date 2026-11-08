@@ -272,8 +272,16 @@ export async function createCatalogPlan(
   const sortOrder = Number(payload.sort_order) || 0;
   const trialDays = Math.max(0, Number(payload.trial_days) || 0);
 
-  const stripePlanId = payload.stripe_plan_id ? String(payload.stripe_plan_id).trim() : null;
-  const stripePriceId = payload.stripe_price_id ? String(payload.stripe_price_id).trim() : null;
+  let stripePriceId = payload.stripe_price_id ? String(payload.stripe_price_id).trim() : null;
+  let stripePlanId = payload.stripe_plan_id ? String(payload.stripe_plan_id).trim() : null;
+
+  // Si se envió stripe_price_id pero no stripe_plan_id, sincronizar ambos para compatibilidad
+  if (stripePriceId && !stripePlanId) {
+    stripePlanId = stripePriceId;
+  } else if (stripePlanId && !stripePriceId) {
+    stripePriceId = stripePlanId;
+  }
+
   const stripeProductId = payload.stripe_product_id ? String(payload.stripe_product_id).trim() : null;
   const paypalPlanId = payload.paypal_plan_id ? String(payload.paypal_plan_id).trim() : null;
   const razorpayPlanId = payload.razorpay_plan_id ? String(payload.razorpay_plan_id).trim() : null;
@@ -401,18 +409,24 @@ export async function updateCatalogPlan(
     Number(payload.trial_days !== undefined ? payload.trial_days : prev.trial_days) || 0
   );
 
-  const stripePlanId =
+  let stripePlanId =
     payload.stripe_plan_id !== undefined
       ? payload.stripe_plan_id
         ? String(payload.stripe_plan_id).trim()
         : null
       : prev.stripe_plan_id;
-  const stripePriceId =
+  let stripePriceId =
     payload.stripe_price_id !== undefined
       ? payload.stripe_price_id
         ? String(payload.stripe_price_id).trim()
         : null
       : prev.stripe_price_id;
+
+  if (stripePriceId && !stripePlanId) {
+    stripePlanId = stripePriceId;
+  } else if (stripePlanId && !stripePriceId) {
+    stripePriceId = stripePlanId;
+  }
   const stripeProductId =
     payload.stripe_product_id !== undefined
       ? payload.stripe_product_id

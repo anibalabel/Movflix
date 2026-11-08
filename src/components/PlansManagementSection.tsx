@@ -804,15 +804,18 @@ export default function PlansManagementSection() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-zinc-800">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                    Stripe Price ID (Opcional)
+                    Stripe Price ID o Payment Link (Opcional)
                   </label>
                   <input
                     type="text"
                     value={formStripePriceId}
                     onChange={(e) => setFormStripePriceId(e.target.value)}
-                    placeholder="price_1Nxxxxxxxxxx"
+                    placeholder="price_1Nxxxxxxxxxx o plink_1Uxxxxxxxxxx"
                     className="w-full px-3.5 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
                   />
+                  <span className="block text-[10px] text-zinc-500 mt-1">
+                    Acepta un Price ID (price_...) o enlace directo de pago de Stripe (plink_...).
+                  </span>
                 </div>
 
                 <div>
