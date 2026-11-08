@@ -5,6 +5,7 @@ import Link from 'next/link';
 import MediaCard, { MediaItemSummary } from '@/components/MediaCard';
 import { AuthUser } from '@/components/LoginModal';
 import RequestsAndSuggestionsPanel from '@/components/RequestsAndSuggestionsPanel';
+import PlansManagementSection from '@/components/PlansManagementSection';
 import {
   Heart,
   User,
@@ -712,6 +713,9 @@ export default function UserDashboardPage() {
 
       {/* Movie Requests & Suggestions Section */}
       <RequestsAndSuggestionsPanel />
+
+      {/* Admin Plans & Subscriptions Management Module */}
+      {user.role === 'admin' && <PlansManagementSection />}
     </div>
   );
 }
