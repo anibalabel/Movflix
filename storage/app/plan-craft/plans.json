@@ -1,1 +1,48 @@
-[]
+[
+  {
+    "id": 1,
+    "key": "estandar4dispositivoanual",
+    "slug": "estandar4dispositivoanual",
+    "name": "Estándar",
+    "description": "Acceso ilimitado a todo el catálogo de películas, series y animes en alta definición.",
+    "price": 9.99,
+    "formatted_price": "€9.99",
+    "currency": "EUR",
+    "currency_plan_app": "EUR",
+    "interval": "year",
+    "interval_count": 1,
+    "interval_label": "Anual",
+    "pack_duration": 30,
+    "trial_days": 10,
+    "is_active": true,
+    "is_featured": false,
+    "sort_order": 0,
+    "stripe_plan_id": "price_1UZTOX3UbPF05MP7u6Zvo5wS",
+    "stripe_price_id": "price_1UZTOX3UbPF05MP7u6Zvo5wS",
+    "stripe_product_id": null,
+    "paypal_plan_id": null,
+    "razorpay_plan_id": null,
+    "features": [
+      "Full HD y 4K Ultra HD",
+      "Sin publicidad",
+      "Descarga en app móvil",
+      "Soporte para Smart TV",
+      "4 Dispositivos simultáneos",
+      "4 Perfiles máximos",
+      "10 Días de prueba gratis"
+    ],
+    "eligibilities": {
+      "max_devices": 4,
+      "max_profiles": 4
+    },
+    "max_devices": 4,
+    "max_profiles": 4,
+    "monthly_incentive": null,
+    "yearly_incentive": null,
+    "has_stripe": true,
+    "has_paypal": false,
+    "has_razorpay": false,
+    "created_at": "Sun Nov 08 2026 10:51:20 GMT+0100 (hora estándar de Europa central)",
+    "updated_at": "Sun Nov 08 2026 10:51:20 GMT+0100 (hora estándar de Europa central)"
+  }
+]
