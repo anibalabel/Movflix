@@ -1,6 +1,6 @@
 <?php
 class DooplexDatabase {
-    private string $host = '';
+    private string $host = ''; /datatabase del EasEasyPlex
     private int $port = 3306;
     private string $dbname = '';
     private string $username = '';
