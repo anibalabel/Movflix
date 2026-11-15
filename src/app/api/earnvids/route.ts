@@ -1,28 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/db';
 import { unpackDeanEdwards } from '@/app/api/streamwish/route';
-
-const BROWSER_USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+import {
+  EARNVIDS_USER_AGENT,
+  buildSignedManifestProxyUrl,
+} from '@/lib/earnvids-manifest';
 
 function extractEarnVidsStreamAndMeta(
   source: string,
   originUrl: string
 ): {
-  streamingUrl: string | null;
+  hls4Url: string | null;
+  fallbackUrl: string | null;
   thumbnail: string | null;
 } {
-  let streamingUrl: string | null = null;
+  let hls4Url: string | null = null;
+  let fallbackUrl: string | null = null;
   let thumbnail: string | null = null;
 
   // Normalizar barras escapadas (`https:\/\/...`) presentes en respuestas JSON/ofuscadas
   const normalized = source.replace(/\\\//g, '/');
 
   // EarnVids / VidHide entrega las fuentes en un objeto `links`:
-  //   hls4: "/stream/<token>/.../master.m3u8"  -> ruta relativa en el dominio del embed (NO envía CORS).
-  //   hls3: "https://.../master.txt"           -> host inestable.
-  //   hls2: "https://<cdn>/hls2/.../master.m3u8?t=..." -> CDN con `Access-Control-Allow-Origin: *`.
-  // Solo devolvemos URLs absolutas cross-origin para evitar errores CORS en hls.js.
+  //   hls4: "/stream/<token>/.../master.m3u8" -> NO tiene bloqueo por ASN/IP, pero le falta cabecera CORS.
+  //         Sus segmentos reales en index-v1-a1.m3u8 apuntan a tiktokcdn.com con CORS `*`.
+  //         Al servir los manifiestos vía /api/earnvids/manifest, hls.js reproduce directo sin bloqueo por ASN.
+  //   hls2: "https://<cdn>/hls2/.../master.m3u8?t=...&asn=..." -> Firmado al ASN del servidor (403 en el cliente).
   const embedOrigin = (() => {
     try {
       return new URL(originUrl).origin;
@@ -38,27 +41,33 @@ function extractEarnVidsStreamAndMeta(
     }
   };
 
-  const hls2Match = normalized.match(
-    /["']?hls2["']?\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
+  const hls4Match = normalized.match(
+    /["']?hls4["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']/i
   );
-  const hls4AbsMatch = normalized.match(
-    /["']?hls4["']?\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
-  );
+  if (hls4Match?.[1]) {
+    try {
+      hls4Url = new URL(hls4Match[1], originUrl).toString();
+    } catch {
+      hls4Url = null;
+    }
+  }
+
   const fileM3u8Match = normalized.match(
     /file\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
+  );
+  const hls2Match = normalized.match(
+    /["']?hls2["']?\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
   );
   const genericM3u8Match = normalized.match(
     /(https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*)/i
   );
 
-  if (hls2Match?.[1]) {
-    streamingUrl = hls2Match[1];
-  } else if (hls4AbsMatch?.[1] && isCrossOrigin(hls4AbsMatch[1])) {
-    streamingUrl = hls4AbsMatch[1];
-  } else if (fileM3u8Match?.[1] && isCrossOrigin(fileM3u8Match[1])) {
-    streamingUrl = fileM3u8Match[1];
+  if (fileM3u8Match?.[1] && isCrossOrigin(fileM3u8Match[1])) {
+    fallbackUrl = fileM3u8Match[1];
+  } else if (hls2Match?.[1] && isCrossOrigin(hls2Match[1])) {
+    fallbackUrl = hls2Match[1];
   } else if (genericM3u8Match?.[1] && isCrossOrigin(genericM3u8Match[1])) {
-    streamingUrl = genericM3u8Match[1];
+    fallbackUrl = genericM3u8Match[1];
   }
 
   // Extraer miniatura / póster
@@ -69,7 +78,23 @@ function extractEarnVidsStreamAndMeta(
     thumbnail = imgMatch[1];
   }
 
-  return { streamingUrl, thumbnail };
+  return { hls4Url, fallbackUrl, thumbnail };
+}
+
+async function isReachableUrl(url: string, referer: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: 'HEAD',
+      headers: {
+        'User-Agent': EARNVIDS_USER_AGENT,
+        Referer: referer,
+      },
+      cache: 'no-store',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function fetchEarnVidsFromUrl(embedUrl: string): Promise<{
@@ -83,7 +108,7 @@ async function fetchEarnVidsFromUrl(embedUrl: string): Promise<{
   const response = await fetch(embedUrl, {
     method: 'GET',
     headers: {
-      'User-Agent': BROWSER_USER_AGENT,
+      'User-Agent': EARNVIDS_USER_AGENT,
       Referer: `${uri.origin}/`,
       Accept:
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -105,16 +130,35 @@ async function fetchEarnVidsFromUrl(embedUrl: string): Promise<{
   const resolvedOrigin = response.url || embedUrl;
 
   // 1. Probar en texto plano
-  let { streamingUrl, thumbnail } = extractEarnVidsStreamAndMeta(html, resolvedOrigin);
+  let { hls4Url, fallbackUrl, thumbnail } = extractEarnVidsStreamAndMeta(
+    html,
+    resolvedOrigin
+  );
 
-  // 2. Si no, desempaquetar con Dean Edwards
-  if (!streamingUrl) {
+  // 2. Si no apareció hls4 en texto plano, desempaquetar con Dean Edwards
+  if (!hls4Url) {
     const unpacked = unpackDeanEdwards(html);
     if (unpacked) {
       const extracted = extractEarnVidsStreamAndMeta(unpacked, resolvedOrigin);
-      streamingUrl = extracted.streamingUrl;
+      if (extracted.hls4Url) hls4Url = extracted.hls4Url;
+      if (!fallbackUrl && extracted.fallbackUrl) fallbackUrl = extracted.fallbackUrl;
       if (extracted.thumbnail) thumbnail = extracted.thumbnail;
     }
+  }
+
+  let streamingUrl: string | null = null;
+  if (hls4Url) {
+    const embedHostOrigin = new URL(resolvedOrigin).origin;
+    const hls4Origin = new URL(hls4Url).origin;
+    if (hls4Origin !== embedHostOrigin) {
+      streamingUrl = hls4Url;
+    } else if (await isReachableUrl(hls4Url, resolvedOrigin)) {
+      streamingUrl = buildSignedManifestProxyUrl(hls4Url, resolvedOrigin);
+    }
+  }
+
+  if (!streamingUrl && fallbackUrl) {
+    streamingUrl = fallbackUrl;
   }
 
   return {
