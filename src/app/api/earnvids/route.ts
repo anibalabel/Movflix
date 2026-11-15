@@ -60,18 +60,31 @@ export async function resolveEarnVidsUrl(
   rawFilecode?: string
 ) {
   let filecode = (rawFilecode || '').trim();
+  if (filecode.toLowerCase() === 'embed') {
+    filecode = '';
+  }
+
   if (!filecode && targetUrl) {
-    const match = targetUrl.match(
-      /(?:\/(?:embed|e|v|d)\/|^https?:\/\/[^\/]+\/)([a-zA-Z0-9_-]+)/i
-    );
-    if (match?.[1]) {
-      filecode = match[1];
+    const pathMatch = targetUrl.match(/\/(?:embed|e|v|d)\/([a-zA-Z0-9_-]+)/i);
+    if (pathMatch && pathMatch[1] && pathMatch[1].toLowerCase() !== 'embed') {
+      filecode = pathMatch[1];
+    } else {
+      try {
+        const parsed = new URL(targetUrl.trim());
+        const segments = parsed.pathname.split('/').filter(Boolean);
+        const last = segments[segments.length - 1];
+        if (last && last.toLowerCase() !== 'embed' && last.toLowerCase() !== 'e') {
+          filecode = last;
+        }
+      } catch {
+        // ignore
+      }
     }
   }
 
-  const embedUrl = targetUrl && targetUrl.trim() !== ''
-    ? targetUrl.trim()
-    : `https://morencius.com/embed/${filecode}`;
+  const embedUrl = filecode
+    ? `https://morencius.com/embed/${filecode}`
+    : (targetUrl || '').trim();
 
   const uri = new URL(embedUrl);
 

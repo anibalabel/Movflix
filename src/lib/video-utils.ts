@@ -354,9 +354,22 @@ export function extractEarnVidsFilecode(
     return null;
   }
 
-  const match = trimmed.match(/(?:\/(?:embed|e|v|d)\/|^https?:\/\/[^\/]+\/)([a-zA-Z0-9_-]+)/i);
-  if (match && match[1]) {
-    return match[1];
+  // 1. Probar ruta estándar /embed/code, /e/code, /v/code, /d/code
+  const pathMatch = trimmed.match(/\/(?:embed|e|v|d)\/([a-zA-Z0-9_-]+)/i);
+  if (pathMatch && pathMatch[1] && pathMatch[1].toLowerCase() !== 'embed') {
+    return pathMatch[1];
+  }
+
+  // 2. Probar último segmento del path si no es 'embed'
+  try {
+    const url = new URL(trimmed);
+    const segments = url.pathname.split('/').filter(Boolean);
+    const last = segments[segments.length - 1];
+    if (last && last.toLowerCase() !== 'embed' && last.toLowerCase() !== 'e') {
+      return last;
+    }
+  } catch {
+    // ignore
   }
 
   return null;
