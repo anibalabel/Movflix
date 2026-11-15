@@ -20,9 +20,56 @@ declare global {
   var __DOOPLEX_DB_CONFIG: DbConnectionParams | undefined;
 }
 
+const APP_SECRET_FILE = '.app-secret';
+let cachedAppSecret: string | null = null;
+
+/**
+ * Secreto de la aplicación para firmar sesiones/JWT y cifrar la cookie del instalador.
+ * NUNCA debe estar escrito en el código (el repositorio es público).
+ * Orden de resolución:
+ *  1. Variable de entorno JWT_SECRET (recomendado en producción / Cloudflare).
+ *  2. Archivo local `.app-secret` (ignorado por Git), generado al azar la primera vez (dev / VPS).
+ *  3. Derivado de DB_PASSWORD (privado, configurado por el instalador) si no hay disco escribible.
+ * Si ninguna opción está disponible lanza un error en lugar de usar un valor público.
+ */
+export function getAppSecret(): string {
+  const fromEnv = (process.env.JWT_SECRET || '').trim();
+  if (fromEnv.length >= 16) return fromEnv;
+  if (cachedAppSecret) return cachedAppSecret;
+
+  const filePath = path.join(process.cwd(), APP_SECRET_FILE);
+  try {
+    if (fs.existsSync(filePath)) {
+      const stored = fs.readFileSync(filePath, 'utf8').trim();
+      if (stored.length >= 32) {
+        cachedAppSecret = stored;
+        return stored;
+      }
+    }
+    const generated = crypto.randomBytes(48).toString('hex');
+    fs.writeFileSync(filePath, generated, { encoding: 'utf8', mode: 0o600 });
+    cachedAppSecret = generated;
+    return generated;
+  } catch {
+    // Sistema de archivos de solo lectura (Workers / serverless): probar siguiente opción
+  }
+
+  const dbPassword = process.env.DB_PASSWORD || globalThis.__DOOPLEX_DB_CONFIG?.password || '';
+  if (dbPassword.length >= 8) {
+    cachedAppSecret = crypto
+      .createHmac('sha256', dbPassword)
+      .update('dooplex-app-secret-v1')
+      .digest('hex');
+    return cachedAppSecret;
+  }
+
+  throw new Error(
+    'AUTH_SECRET_MISSING: define la variable de entorno JWT_SECRET (mínimo 16 caracteres aleatorios).'
+  );
+}
+
 function getEncryptionKey(): Buffer {
-  const secret = process.env.JWT_SECRET || 'dooplex-installer-aes-secret-key-2026';
-  return crypto.createHash('sha256').update(secret).digest();
+  return crypto.createHash('sha256').update(`enc:${getAppSecret()}`).digest();
 }
 
 export function encryptDbConfig(cfg: DbConnectionParams): string {
@@ -339,12 +386,103 @@ export function createAccessToken(payload: Record<string, unknown>, expiresInSec
       exp: now + expiresInSeconds,
     })
   ).toString('base64url');
-  const secret = process.env.JWT_SECRET || 'dooplex-jwt-secret-key-2026';
+  const secret = getAppSecret();
   const signature = crypto
     .createHmac('sha256', secret)
     .update(`${header}.${body}`)
     .digest('base64url');
   return `${header}.${body}.${signature}`;
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/** Verifica un JWT HS256 emitido por createAccessToken (firma + expiración). */
+export function verifyAccessToken(token: string): Record<string, unknown> | null {
+  try {
+    const parts = (token || '').split('.');
+    if (parts.length !== 3) return null;
+    const [header, body, signature] = parts;
+
+    const headerJson = JSON.parse(Buffer.from(header, 'base64url').toString('utf8'));
+    if (headerJson?.alg !== 'HS256') return null;
+
+    const expected = crypto
+      .createHmac('sha256', getAppSecret())
+      .update(`${header}.${body}`)
+      .digest('base64url');
+    if (!safeEqual(signature, expected)) return null;
+
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if (typeof payload.exp === 'number' && payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export const SESSION_COOKIE_NAME = 'dooplex_session';
+export const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 días
+
+/**
+ * Firma el contenido de la sesión: `<payload base64url>.<HMAC-SHA256 base64url>`.
+ * Una cookie manipulada o fabricada sin el secreto es rechazada por verifySessionCookie.
+ */
+export function signSessionCookie(
+  user: Record<string, unknown>,
+  ttlSeconds = SESSION_COOKIE_MAX_AGE
+): string {
+  const payload = Buffer.from(
+    JSON.stringify({ ...user, exp: Math.floor(Date.now() / 1000) + ttlSeconds })
+  ).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', getAppSecret())
+    .update(`session.${payload}`)
+    .digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+/** Devuelve los datos de sesión solo si la firma es válida y no ha expirado. */
+export function verifySessionCookie(value: string | null | undefined): Record<string, unknown> | null {
+  try {
+    if (!value) return null;
+    const dot = value.lastIndexOf('.');
+    if (dot <= 0) return null; // formato antiguo sin firma (base64 plano): se rechaza
+    const payload = value.slice(0, dot);
+    const signature = value.slice(dot + 1);
+
+    const expected = crypto
+      .createHmac('sha256', getAppSecret())
+      .update(`session.${payload}`)
+      .digest('base64url');
+    if (!safeEqual(signature, expected)) return null;
+
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!parsed || typeof parsed !== 'object' || !parsed.id) return null;
+    if (typeof parsed.exp === 'number' && parsed.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Opciones comunes para escribir la cookie de sesión. */
+export function sessionCookieOptions(maxAge = SESSION_COOKIE_MAX_AGE) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge,
+    sameSite: 'lax' as const,
+  };
 }
 
 export interface SessionUserPayload {
@@ -357,48 +495,36 @@ export interface SessionUserPayload {
 }
 
 export function getSessionUserFromRequest(request: NextRequest): SessionUserPayload | null {
-  // 1. Check dooplex_session cookie
-  const cookie = request.cookies.get('dooplex_session')?.value;
-  if (cookie) {
-    try {
-      const parsed = JSON.parse(Buffer.from(cookie, 'base64').toString('utf8'));
-      if (parsed && parsed.id) {
-        return {
-          id: Number(parsed.id),
-          username: parsed.username || parsed.name,
-          name: parsed.name || parsed.username,
-          email: parsed.email,
-          role: parsed.role || 'user',
-          avatar: parsed.avatar || null,
-        };
-      }
-    } catch {
-      // fallback to Authorization header
-    }
+  // 1. Cookie de sesión firmada
+  const parsed = verifySessionCookie(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+  if (parsed) {
+    const p = parsed as Record<string, string | number | null | undefined>;
+    return {
+      id: Number(p.id),
+      username: (p.username || p.name) as string | undefined,
+      name: (p.name || p.username) as string | undefined,
+      email: p.email as string | undefined,
+      role: (p.role as string) || 'user',
+      avatar: (p.avatar as string) || null,
+    };
   }
 
-  // 2. Check Authorization: Bearer <token>
+  // 2. Authorization: Bearer <token> (JWT con firma y expiración verificadas)
   const authHeader = request.headers.get('authorization');
   if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
-    const token = authHeader.slice(7).trim();
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      try {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-        const userId = Number(payload.sub || payload.id);
-        if (userId) {
-          return {
-            id: userId,
-            username: payload.name || payload.email,
-            name: payload.name || payload.email,
-            email: payload.email,
-            role: payload.role || 'user',
-            avatar: payload.avatar || null,
-          };
-        }
-      } catch {
-        return null;
-      }
+    const payload = verifyAccessToken(authHeader.slice(7).trim()) as
+      | Record<string, string | number | null | undefined>
+      | null;
+    const userId = payload ? Number(payload.sub || payload.id) : 0;
+    if (payload && userId) {
+      return {
+        id: userId,
+        username: (payload.name || payload.email) as string | undefined,
+        name: (payload.name || payload.email) as string | undefined,
+        email: payload.email as string | undefined,
+        role: (payload.role as string) || 'user',
+        avatar: (payload.avatar as string) || null,
+      };
     }
   }
 

@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withDb } from '@/lib/db';
+import { withDb, verifySessionCookie, SESSION_COOKIE_NAME } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { RowDataPacket } from 'mysql2';
 
 function getSessionUser(request: NextRequest): { id: number; name: string; email: string; role: string } | null {
-  const cookie = request.cookies.get('dooplex_session')?.value;
-  if (!cookie) return null;
-  try {
-    return JSON.parse(Buffer.from(cookie, 'base64').toString('utf8'));
-  } catch {
-    return null;
-  }
+  return verifySessionCookie(request.cookies.get(SESSION_COOKIE_NAME)?.value) as {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+  } | null;
 }
 
 export async function POST(request: NextRequest) {

@@ -5,6 +5,9 @@ import {
   DEFAULT_GOOGLE_CLIENT_ID,
   normalizeAvatarUrl,
   createAccessToken,
+  signSessionCookie,
+  sessionCookieOptions,
+  SESSION_COOKIE_NAME,
 } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -375,13 +378,11 @@ export async function POST(request: NextRequest) {
         { status: 200 }
       );
 
-      const cookiePayload = Buffer.from(JSON.stringify(userData)).toString('base64');
-      response.cookies.set('dooplex_session', cookiePayload, {
-        httpOnly: true,
-        path: '/',
-        maxAge: 60 * 60 * 24 * 30, // 30 días en navegador
-        sameSite: 'lax',
-      });
+      response.cookies.set(
+        SESSION_COOKIE_NAME,
+        signSessionCookie(userData),
+        sessionCookieOptions(60 * 60 * 24 * 30) // 30 días en navegador
+      );
 
       return response;
     });

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withDb } from '@/lib/db';
+import {
+  withDb,
+  signSessionCookie,
+  sessionCookieOptions,
+  SESSION_COOKIE_NAME,
+} from '@/lib/db';
 import {
   WEB_GOOGLE_REDIRECT_URI,
   getGoogleSettings,
@@ -61,7 +66,8 @@ export async function GET(request: NextRequest) {
         forceSyncAvatar
       );
 
-      const cookiePayload = Buffer.from(JSON.stringify(userData)).toString('base64');
+      const cookiePayload = signSessionCookie(userData, 60 * 60 * 24 * 30);
+      const cookieOptions = sessionCookieOptions(60 * 60 * 24 * 30);
 
       if (wantsJson) {
         const jsonRes = NextResponse.json(
@@ -76,22 +82,12 @@ export async function GET(request: NextRequest) {
           },
           { status: 200 }
         );
-        jsonRes.cookies.set('dooplex_session', cookiePayload, {
-          httpOnly: true,
-          path: '/',
-          maxAge: 60 * 60 * 24 * 30,
-          sameSite: 'lax',
-        });
+        jsonRes.cookies.set(SESSION_COOKIE_NAME, cookiePayload, cookieOptions);
         return jsonRes;
       }
 
       const redirectRes = NextResponse.redirect(new URL('/dashboard', request.url));
-      redirectRes.cookies.set('dooplex_session', cookiePayload, {
-        httpOnly: true,
-        path: '/',
-        maxAge: 60 * 60 * 24 * 30,
-        sameSite: 'lax',
-      });
+      redirectRes.cookies.set(SESSION_COOKIE_NAME, cookiePayload, cookieOptions);
       return redirectRes;
     });
   } catch (error: unknown) {

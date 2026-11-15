@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withDb } from '@/lib/db';
+import {
+  withDb,
+  verifySessionCookie,
+  signSessionCookie,
+  sessionCookieOptions,
+  SESSION_COOKIE_NAME,
+} from '@/lib/db';
 
 function getSessionUser(request: NextRequest) {
-  const cookie = request.cookies.get('dooplex_session')?.value;
-  if (!cookie) return null;
-  try {
-    return JSON.parse(Buffer.from(cookie, 'base64').toString('utf8'));
-  } catch {
-    return null;
-  }
+  return verifySessionCookie(request.cookies.get(SESSION_COOKIE_NAME)?.value);
 }
 
 export async function POST(request: NextRequest) {
@@ -41,13 +41,11 @@ export async function POST(request: NextRequest) {
         avatar,
       });
 
-      const tokenPayload = Buffer.from(JSON.stringify(updatedUser)).toString('base64');
-      response.cookies.set('dooplex_session', tokenPayload, {
-        httpOnly: true,
-        path: '/',
-        maxAge: 60 * 60 * 24 * 7,
-        sameSite: 'lax',
-      });
+      response.cookies.set(
+        SESSION_COOKIE_NAME,
+        signSessionCookie(updatedUser),
+        sessionCookieOptions()
+      );
 
       return response;
     });

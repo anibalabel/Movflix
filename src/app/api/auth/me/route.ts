@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withDb, normalizeAvatarUrl } from '@/lib/db';
+import {
+  withDb,
+  normalizeAvatarUrl,
+  verifySessionCookie,
+  SESSION_COOKIE_NAME,
+} from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 
 export async function GET(request: NextRequest) {
-  const cookie = request.cookies.get('dooplex_session')?.value;
+  const cookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!cookie) {
     return NextResponse.json({ authenticated: false, user: null });
   }
   try {
-    const sessionUser = JSON.parse(Buffer.from(cookie, 'base64').toString('utf8'));
+    const sessionUser = verifySessionCookie(cookie) as { id?: number } | null;
     if (!sessionUser?.id) {
       return NextResponse.json({ authenticated: false, user: null });
     }

@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 const BLOCKED_PREFIXES = [
   '/.env',
   '/.db-config',
+  '/.app-secret',
   '/.git',
   '/.aws',
   '/.ssh',

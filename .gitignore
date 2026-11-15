@@ -8,4 +8,5 @@ out
 .env.*
 !.env.example
 .db-config.json
+.app-secret
 apiweb/db_dooplex/config.local.php
