@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
 
       response.cookies.set(
         SESSION_COOKIE_NAME,
-        signSessionCookie(userData),
+        signSessionCookie(userData, 60 * 60 * 24 * 30),
         sessionCookieOptions(60 * 60 * 24 * 30) // 30 días en navegador
       );
 
