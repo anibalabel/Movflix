@@ -176,3 +176,46 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function POST(request: NextRequest) {
+  const sessionUser = getSessionUserFromRequest(request);
+  if (!sessionUser || !sessionUser.id) {
+    return NextResponse.json(
+      {
+        success: false,
+        requiresAuth: true,
+        error:
+          'Debes iniciar sesión con tu cuenta para reproducir servidores en Stream Directo (Sin Anuncios).',
+      },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const rawUrl = String(body.url || '').trim();
+    const filecode = String(body.filecode || '').trim();
+
+    if (!rawUrl && !filecode) {
+      return NextResponse.json(
+        { success: false, error: 'Se requiere el campo url o filecode' },
+        { status: 400 }
+      );
+    }
+
+    const result = await resolveEarnVidsUrl(rawUrl, filecode);
+    return NextResponse.json({
+      success: Boolean(result.streaming_url),
+      ...result,
+    });
+  } catch (error: unknown) {
+    console.error('Error in POST /api/earnvids:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error al extraer stream de EarnVids',
+      },
+      { status: 500 }
+    );
+  }
+}
