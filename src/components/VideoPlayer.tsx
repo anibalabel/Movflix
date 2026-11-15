@@ -234,7 +234,8 @@ export default function VideoPlayer({
     if (
       (activeVideo.playerType === 'vidara' ||
         activeVideo.playerType === 'streamwish' ||
-        activeVideo.playerType === 'uqload') &&
+        activeVideo.playerType === 'uqload' ||
+        activeVideo.playerType === 'earnvids') &&
       vidaraStarted &&
       vidaraInfo?.streaming_url &&
       vidaraInfo.streaming_url.toLowerCase().includes('.m3u8')
@@ -482,7 +483,8 @@ export default function VideoPlayer({
                   <span>
                     {video.playerType === 'vidara' ||
                     video.playerType === 'streamwish' ||
-                    video.playerType === 'uqload'
+                    video.playerType === 'uqload' ||
+                    video.playerType === 'earnvids'
                       ? 'DIRECTO'
                       : video.playerType === 'hls'
                       ? 'HLS'
@@ -569,7 +571,8 @@ export default function VideoPlayer({
               {/* Mode 0: Vidara, StreamWish & Uqload Direct Stream with Pre-Play Thumbnail Cover */}
             {(activeVideo.playerType === 'vidara' ||
               activeVideo.playerType === 'streamwish' ||
-              activeVideo.playerType === 'uqload') && (
+              activeVideo.playerType === 'uqload' ||
+              activeVideo.playerType === 'earnvids') && (
               <>
                 {vidaraLoading ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 gap-3">
@@ -704,7 +707,8 @@ export default function VideoPlayer({
               {activeVideo.langFlag} {activeVideo.langLabel})
               {(activeVideo.playerType === 'vidara' ||
                 activeVideo.playerType === 'streamwish' ||
-                activeVideo.playerType === 'uqload') &&
+                activeVideo.playerType === 'uqload' ||
+                activeVideo.playerType === 'earnvids') &&
                 vidaraInfo?.streaming_url && (
                   <span className="ml-2 text-emerald-400 font-semibold">
                     • Stream Directo HLS
