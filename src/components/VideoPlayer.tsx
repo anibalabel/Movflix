@@ -138,10 +138,13 @@ export default function VideoPlayer({
     const isUqload =
       activeVideo?.playerType === 'uqload' &&
       Boolean(activeVideo?.uqloadFilecode);
+    const isEarnVids =
+      activeVideo?.playerType === 'earnvids' &&
+      Boolean(activeVideo?.earnvidsFilecode);
 
     if (
       !activeVideo ||
-      (!isVidara && !isStreamWish && !isUqload) ||
+      (!isVidara && !isStreamWish && !isUqload && !isEarnVids) ||
       (activeVideo.requiresAuth && !isAuthenticated)
     ) {
       setVidaraInfo(null);
@@ -159,13 +162,17 @@ export default function VideoPlayer({
       ? '/api/vidara'
       : isStreamWish
       ? '/api/streamwish'
-      : '/api/uqload';
+      : isUqload
+      ? '/api/uqload'
+      : '/api/earnvids';
     const filecode =
       (isVidara
         ? activeVideo.vidaraFilecode
         : isStreamWish
         ? activeVideo.streamwishFilecode
-        : activeVideo.uqloadFilecode) || '';
+        : isUqload
+        ? activeVideo.uqloadFilecode
+        : activeVideo.earnvidsFilecode) || '';
     const payload = isVidara
       ? { filecode }
       : {

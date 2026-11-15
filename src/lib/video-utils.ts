@@ -24,6 +24,7 @@ export interface NormalizedVideoLink extends RawVideoLink {
     | 'vidara'
     | 'streamwish'
     | 'uqload'
+    | 'earnvids'
     | 'hls'
     | 'mp4'
     | 'youtube'
@@ -32,8 +33,18 @@ export interface NormalizedVideoLink extends RawVideoLink {
   vidaraFilecode: string | null;
   streamwishFilecode: string | null;
   uqloadFilecode: string | null;
+  earnvidsFilecode: string | null;
   requiresAuth: boolean;
 }
+
+const EARNVIDS_HOST_KEYWORDS = [
+  'earnvids',
+  'morencius',
+  'vidhide',
+  'smoothpre',
+  'vidembed',
+  'earnv',
+];
 
 const STREAMWISH_HOST_KEYWORDS = [
   'streamwish',
@@ -316,6 +327,42 @@ export function extractUqloadFilecode(
 }
 
 /**
+ * Extrae el filecode de EarnVids / VidHide / Morencius
+ * (ej. https://morencius.com/embed/hkfu8o6gimjm o https://earnvids.com/e/hkfu8o6gimjm -> "hkfu8o6gimjm")
+ */
+export function extractEarnVidsFilecode(
+  link: string,
+  rawServer?: string | null,
+  rawHeader?: string | null
+): string | null {
+  const trimmed = (link || '').trim();
+  if (!trimmed) return null;
+
+  let isEarnVidsDomain = false;
+  try {
+    const url = new URL(trimmed);
+    const host = url.hostname.toLowerCase();
+    if (EARNVIDS_HOST_KEYWORDS.some((kw) => host.includes(kw))) {
+      isEarnVidsDomain = true;
+    }
+  } catch {
+    // ignore
+  }
+
+  const combined = `${rawHeader || ''} ${rawServer || ''} ${trimmed}`.toLowerCase();
+  if (!isEarnVidsDomain && !EARNVIDS_HOST_KEYWORDS.some((kw) => combined.includes(kw))) {
+    return null;
+  }
+
+  const match = trimmed.match(/(?:\/(?:embed|e|v|d)\/|^https?:\/\/[^\/]+\/)([a-zA-Z0-9_-]+)/i);
+  if (match && match[1]) {
+    return match[1];
+  }
+
+  return null;
+}
+
+/**
  * Normaliza enlaces de servidores embed como Vidara que en la BD vienen con `/v/`
  * (ej. https://vidara.so/v/qo1LOLLEEEw3i -> https://vidara.so/e/qo1LOLLEEEw3i)
  */
@@ -360,6 +407,11 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     video.server,
     video.header
   );
+  const earnvidsFilecode = extractEarnVidsFilecode(
+    rawLink,
+    video.server,
+    video.header
+  );
 
   const isHlsFlag = Number(video.hls) === 1;
   const isYoutubeFlag = Number(video.youtubelink) === 1;
@@ -382,6 +434,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     | 'vidara'
     | 'streamwish'
     | 'uqload'
+    | 'earnvids'
     | 'hls'
     | 'mp4'
     | 'youtube'
@@ -389,9 +442,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
   let playbackUrl = link;
 
   // Regla principal de `supported_hosts`:
-  // Solo si `supported_hosts == 1` está activo intentamos usar los extractores propios implementados (Vidara, StreamWish y Uqload).
-  // Si `supported_hosts == 1` está activo pero aún no existe extractor para ese servidor (ej. Doodstream, MixDrop, DropLoad, EarnVids),
-  // se queda en `embed` hasta que se incorpore su extractor.
+  // Solo si `supported_hosts == 1` está activo intentamos usar los extractores propios implementados (Vidara, StreamWish, Uqload y EarnVids).
   if (isSupportedHostFlag) {
     if (vidaraFilecode) {
       playerType = 'vidara';
@@ -401,6 +452,9 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     } else if (uqloadFilecode) {
       playerType = 'uqload';
       playbackUrl = `https://uqload.vc/e/${uqloadFilecode}`;
+    } else if (earnvidsFilecode) {
+      playerType = 'earnvids';
+      playbackUrl = `https://morencius.com/embed/${earnvidsFilecode}`;
     } else {
       playerType = 'embed';
     }
@@ -438,6 +492,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     vidaraFilecode,
     streamwishFilecode,
     uqloadFilecode,
+    earnvidsFilecode,
     // Los videos con `supported_hosts == 1` requieren que el usuario esté registrado y logueado
     requiresAuth: isSupportedHostFlag,
   };
