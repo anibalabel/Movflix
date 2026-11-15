@@ -15,34 +15,13 @@ function extractEarnVidsStreamAndMeta(
   let streamingUrl: string | null = null;
   let thumbnail: string | null = null;
 
-  // EarnVids / VidHide entrega las fuentes en un objeto `links`:
-  //   hls4: "/stream/<token>/.../master.m3u8"  -> ruta relativa en el dominio del embed (morencius.com).
-  //                                               NO envía cabecera CORS: solo el propio embed puede leerla,
-  //                                               así que hls.js desde otro dominio jamás podría reproducirla.
-  //   hls3: "https://.../master.txt"           -> host que suele rechazar la conexión.
-  //   hls2: "https://<cdn>/hls2/.../master.m3u8?t=..." -> CDN con `Access-Control-Allow-Origin: *`,
-  //                                               sin exigir Referer. Es la única apta para reproducir en nuestra web.
-  // Por eso solo devolvemos `hls2` (o una URL absoluta de otro origen); nunca la ruta relativa de hls4.
-  const embedOrigin = (() => {
-    try {
-      return new URL(originUrl).origin;
-    } catch {
-      return '';
-    }
-  })();
-  const isCrossOrigin = (candidate: string) => {
-    try {
-      return new URL(candidate).origin !== embedOrigin;
-    } catch {
-      return false;
-    }
-  };
-
+  // 1. EarnVids / VidHide suele estructurar las fuentes en un objeto `links`:
+  // links={"hls4": ".../master.m3u8", "hls2": "https://.../master.m3u8?t=..."}
   const hls2Match = source.match(
     /["']?hls2["']?\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
   );
-  const hls4AbsMatch = source.match(
-    /["']?hls4["']?\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
+  const hls4Match = source.match(
+    /["']?hls4["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']/i
   );
   const genericM3u8Match = source.match(
     /(https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*)/i
@@ -50,13 +29,20 @@ function extractEarnVidsStreamAndMeta(
 
   if (hls2Match?.[1]) {
     streamingUrl = hls2Match[1];
-  } else if (hls4AbsMatch?.[1] && isCrossOrigin(hls4AbsMatch[1])) {
-    streamingUrl = hls4AbsMatch[1];
-  } else if (genericM3u8Match?.[1] && isCrossOrigin(genericM3u8Match[1])) {
+  } else if (hls4Match?.[1]) {
+    const raw = hls4Match[1];
+    if (raw.startsWith('http')) {
+      streamingUrl = raw;
+    } else {
+      try {
+        streamingUrl = new URL(raw, originUrl).toString();
+      } catch {
+        streamingUrl = null;
+      }
+    }
+  } else if (genericM3u8Match?.[1]) {
     streamingUrl = genericM3u8Match[1];
   }
-  // Si no hay una fuente reproducible entre dominios, streamingUrl queda en null
-  // y el reproductor cae automáticamente al embed oficial (fallback_embed).
 
   // Extraer miniatura / póster
   const imgMatch = source.match(

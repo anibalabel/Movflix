@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  withDb,
-  normalizeAvatarUrl,
-  createAccessToken,
-  signSessionCookie,
-  sessionCookieOptions,
-  SESSION_COOKIE_NAME,
-} from '@/lib/db';
+import { withDb, normalizeAvatarUrl, createAccessToken } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { RowDataPacket } from 'mysql2';
@@ -109,11 +102,13 @@ export async function POST(request: NextRequest) {
         data: userData,
       });
 
-      response.cookies.set(
-        SESSION_COOKIE_NAME,
-        signSessionCookie(userData),
-        sessionCookieOptions()
-      );
+      const tokenPayload = Buffer.from(JSON.stringify(userData)).toString('base64');
+      response.cookies.set('dooplex_session', tokenPayload, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        sameSite: 'lax',
+      });
 
       return response;
     });
