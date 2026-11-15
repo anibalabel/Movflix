@@ -40,6 +40,8 @@ export interface NormalizedVideoLink extends RawVideoLink {
 const EARNVIDS_HOST_KEYWORDS = [
   'earnvids',
   'morencius',
+  'minochinos',
+  'callistanise',
   'vidhide',
   'smoothpre',
   'vidembed',
@@ -83,6 +85,8 @@ const KNOWN_SERVERS: Record<string, string> = {
   earnvids: 'EarnVids',
   vidhide: 'VidHide',
   morencius: 'EarnVids',
+  minochinos: 'EarnVids',
+  callistanise: 'EarnVids',
   smoothpre: 'EarnVids',
   byse: 'Byse.sx',
   voe: 'VOE',

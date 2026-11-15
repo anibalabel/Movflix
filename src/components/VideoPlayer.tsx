@@ -197,6 +197,10 @@ export default function VideoPlayer({
             fallback_embed: data.fallback_embed || activeVideo.playbackUrl,
           });
         } else {
+          console.warn(
+            `[VideoPlayer] Extractor ${endpoint} no devolvió stream directo:`,
+            data
+          );
           setVidaraInfo({
             filecode,
             streaming_url: null,
@@ -206,8 +210,9 @@ export default function VideoPlayer({
           });
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
+        console.warn(`[VideoPlayer] Error llamando a ${endpoint}:`, err);
         setVidaraInfo({
           filecode,
           streaming_url: null,
@@ -269,8 +274,9 @@ export default function VideoPlayer({
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
+        lowLatencyMode: false,
       });
+      let recoveredMediaError = false;
       hls.loadSource(effectiveHlsUrl);
       hls.attachMedia(videoEl);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -278,6 +284,17 @@ export default function VideoPlayer({
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recoveredMediaError) {
+            recoveredMediaError = true;
+            hls?.recoverMediaError();
+            return;
+          }
+          console.warn(
+            '[VideoPlayer] HLS fatal error, cambiando a embed fallback:',
+            data.type,
+            data.details,
+            data.response?.code
+          );
           // Si el token HLS falla por restricción de red/CORS, caer automáticamente al reproductor embed oficial
           setVidaraInfo((prev) =>
             prev ? { ...prev, streaming_url: null } : null

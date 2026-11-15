@@ -15,37 +15,54 @@ function extractEarnVidsStreamAndMeta(
   let streamingUrl: string | null = null;
   let thumbnail: string | null = null;
 
-  // 1. EarnVids / VidHide suele estructurar las fuentes en un objeto `links`:
-  // links={"hls4": ".../master.m3u8", "hls2": "https://.../master.m3u8?t=..."}
-  const hls2Match = source.match(
+  // Normalizar barras escapadas (`https:\/\/...`) presentes en respuestas JSON/ofuscadas
+  const normalized = source.replace(/\\\//g, '/');
+
+  // EarnVids / VidHide entrega las fuentes en un objeto `links`:
+  //   hls4: "/stream/<token>/.../master.m3u8"  -> ruta relativa en el dominio del embed (NO envía CORS).
+  //   hls3: "https://.../master.txt"           -> host inestable.
+  //   hls2: "https://<cdn>/hls2/.../master.m3u8?t=..." -> CDN con `Access-Control-Allow-Origin: *`.
+  // Solo devolvemos URLs absolutas cross-origin para evitar errores CORS en hls.js.
+  const embedOrigin = (() => {
+    try {
+      return new URL(originUrl).origin;
+    } catch {
+      return '';
+    }
+  })();
+  const isCrossOrigin = (candidate: string) => {
+    try {
+      return new URL(candidate).origin !== embedOrigin;
+    } catch {
+      return false;
+    }
+  };
+
+  const hls2Match = normalized.match(
     /["']?hls2["']?\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
   );
-  const hls4Match = source.match(
-    /["']?hls4["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']/i
+  const hls4AbsMatch = normalized.match(
+    /["']?hls4["']?\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
   );
-  const genericM3u8Match = source.match(
+  const fileM3u8Match = normalized.match(
+    /file\s*:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i
+  );
+  const genericM3u8Match = normalized.match(
     /(https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*)/i
   );
 
   if (hls2Match?.[1]) {
     streamingUrl = hls2Match[1];
-  } else if (hls4Match?.[1]) {
-    const raw = hls4Match[1];
-    if (raw.startsWith('http')) {
-      streamingUrl = raw;
-    } else {
-      try {
-        streamingUrl = new URL(raw, originUrl).toString();
-      } catch {
-        streamingUrl = null;
-      }
-    }
-  } else if (genericM3u8Match?.[1]) {
+  } else if (hls4AbsMatch?.[1] && isCrossOrigin(hls4AbsMatch[1])) {
+    streamingUrl = hls4AbsMatch[1];
+  } else if (fileM3u8Match?.[1] && isCrossOrigin(fileM3u8Match[1])) {
+    streamingUrl = fileM3u8Match[1];
+  } else if (genericM3u8Match?.[1] && isCrossOrigin(genericM3u8Match[1])) {
     streamingUrl = genericM3u8Match[1];
   }
 
   // Extraer miniatura / póster
-  const imgMatch = source.match(
+  const imgMatch = normalized.match(
     /(?:image|poster)\s*:\s*["'](https?:\/\/[^"']+)["']/i
   );
   if (imgMatch?.[1]) {
@@ -53,6 +70,59 @@ function extractEarnVidsStreamAndMeta(
   }
 
   return { streamingUrl, thumbnail };
+}
+
+async function fetchEarnVidsFromUrl(embedUrl: string): Promise<{
+  streamingUrl: string | null;
+  thumbnail: string | null;
+  status: number;
+  finalUrl: string;
+}> {
+  const uri = new URL(embedUrl);
+
+  const response = await fetch(embedUrl, {
+    method: 'GET',
+    headers: {
+      'User-Agent': BROWSER_USER_AGENT,
+      Referer: `${uri.origin}/`,
+      Accept:
+        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    return {
+      streamingUrl: null,
+      thumbnail: null,
+      status: response.status,
+      finalUrl: response.url || embedUrl,
+    };
+  }
+
+  const html = await response.text();
+  const resolvedOrigin = response.url || embedUrl;
+
+  // 1. Probar en texto plano
+  let { streamingUrl, thumbnail } = extractEarnVidsStreamAndMeta(html, resolvedOrigin);
+
+  // 2. Si no, desempaquetar con Dean Edwards
+  if (!streamingUrl) {
+    const unpacked = unpackDeanEdwards(html);
+    if (unpacked) {
+      const extracted = extractEarnVidsStreamAndMeta(unpacked, resolvedOrigin);
+      streamingUrl = extracted.streamingUrl;
+      if (extracted.thumbnail) thumbnail = extracted.thumbnail;
+    }
+  }
+
+  return {
+    streamingUrl,
+    thumbnail,
+    status: response.status,
+    finalUrl: resolvedOrigin,
+  };
 }
 
 export async function resolveEarnVidsUrl(
@@ -82,59 +152,62 @@ export async function resolveEarnVidsUrl(
     }
   }
 
-  const embedUrl = filecode
+  const primaryEmbed = filecode
     ? `https://morencius.com/embed/${filecode}`
     : (targetUrl || '').trim();
 
-  const uri = new URL(embedUrl);
+  // Lista ordenada de espejos para tolerar bloqueos por IP o caídas de un dominio concreto
+  const candidateUrls: string[] = [];
+  const pushUnique = (u?: string) => {
+    const clean = (u || '').trim();
+    if (clean && !candidateUrls.includes(clean)) {
+      candidateUrls.push(clean);
+    }
+  };
 
-  const response = await fetch(embedUrl, {
-    method: 'GET',
-    headers: {
-      'User-Agent': BROWSER_USER_AGENT,
-      Referer: `${uri.origin}/`,
-      Accept:
-        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-    },
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    return {
-      filecode: filecode || null,
-      embed_url: embedUrl,
-      streaming_url: null,
-      thumbnail: null,
-      fallback_embed: embedUrl,
-    };
+  pushUnique(primaryEmbed);
+  pushUnique(targetUrl);
+  if (filecode) {
+    pushUnique(`https://smoothpre.com/embed/${filecode}`);
+    pushUnique(`https://callistanise.com/embed/${filecode}`);
   }
 
-  const html = await response.text();
+  let streamingUrl: string | null = null;
+  let thumbnail: string | null = null;
+  let usedEmbed = primaryEmbed;
+  const attempts: Array<{ url: string; status: number }> = [];
 
-  // 1. Probar en texto plano
-  let { streamingUrl, thumbnail } = extractEarnVidsStreamAndMeta(html, embedUrl);
-
-  // 2. Si no, desempaquetar con Dean Edwards
-  if (!streamingUrl) {
-    const unpacked = unpackDeanEdwards(html);
-    if (unpacked) {
-      const extracted = extractEarnVidsStreamAndMeta(unpacked, embedUrl);
-      streamingUrl = extracted.streamingUrl;
-      if (extracted.thumbnail) thumbnail = extracted.thumbnail;
+  for (const candidate of candidateUrls) {
+    try {
+      const res = await fetchEarnVidsFromUrl(candidate);
+      attempts.push({ url: candidate, status: res.status });
+      if (res.thumbnail && !thumbnail) {
+        thumbnail = res.thumbnail;
+      }
+      if (res.streamingUrl) {
+        streamingUrl = res.streamingUrl;
+        usedEmbed = res.finalUrl || candidate;
+        break;
+      }
+    } catch {
+      attempts.push({ url: candidate, status: 0 });
     }
   }
 
   return {
     filecode: filecode || null,
-    embed_url: embedUrl,
+    embed_url: usedEmbed,
     streaming_url: streamingUrl,
     thumbnail,
-    fallback_embed: embedUrl,
+    fallback_embed: primaryEmbed || usedEmbed,
+    ...(streamingUrl ? {} : { attempts }),
   };
 }
 
-export async function GET(request: NextRequest) {
+async function handleEarnVidsRequest(
+  request: NextRequest,
+  getParams: () => Promise<{ rawUrl: string; filecode: string }>
+) {
   const sessionUser = getSessionUserFromRequest(request);
   if (!sessionUser || !sessionUser.id) {
     return NextResponse.json(
@@ -149,9 +222,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const rawUrl = (searchParams.get('url') || '').trim();
-    const filecode = (searchParams.get('filecode') || '').trim();
+    const { rawUrl, filecode } = await getParams();
 
     if (!rawUrl && !filecode) {
       return NextResponse.json(
@@ -161,61 +232,44 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await resolveEarnVidsUrl(rawUrl, filecode);
-    return NextResponse.json({
-      success: Boolean(result.streaming_url),
-      ...result,
-    });
+    return NextResponse.json(
+      {
+        success: Boolean(result.streaming_url),
+        ...result,
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error: unknown) {
-    console.error('Error in GET /api/earnvids:', error);
+    console.error('Error in /api/earnvids:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Error al extraer stream de EarnVids',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Error al extraer stream de EarnVids',
       },
       { status: 500 }
     );
   }
 }
 
+export async function GET(request: NextRequest) {
+  return handleEarnVidsRequest(request, async () => {
+    const { searchParams } = new URL(request.url);
+    return {
+      rawUrl: (searchParams.get('url') || '').trim(),
+      filecode: (searchParams.get('filecode') || '').trim(),
+    };
+  });
+}
+
 export async function POST(request: NextRequest) {
-  const sessionUser = getSessionUserFromRequest(request);
-  if (!sessionUser || !sessionUser.id) {
-    return NextResponse.json(
-      {
-        success: false,
-        requiresAuth: true,
-        error:
-          'Debes iniciar sesión con tu cuenta para reproducir servidores en Stream Directo (Sin Anuncios).',
-      },
-      { status: 401 }
-    );
-  }
-
-  try {
+  return handleEarnVidsRequest(request, async () => {
     const body = await request.json();
-    const rawUrl = String(body.url || '').trim();
-    const filecode = String(body.filecode || '').trim();
-
-    if (!rawUrl && !filecode) {
-      return NextResponse.json(
-        { success: false, error: 'Se requiere el campo url o filecode' },
-        { status: 400 }
-      );
-    }
-
-    const result = await resolveEarnVidsUrl(rawUrl, filecode);
-    return NextResponse.json({
-      success: Boolean(result.streaming_url),
-      ...result,
-    });
-  } catch (error: unknown) {
-    console.error('Error in POST /api/earnvids:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Error al extraer stream de EarnVids',
-      },
-      { status: 500 }
-    );
-  }
+    return {
+      rawUrl: String(body.url || '').trim(),
+      filecode: String(body.filecode || '').trim(),
+    };
+  });
 }
