@@ -40,16 +40,20 @@ function extractUqloadStreamAndMeta(source: string): {
   return { streamingUrl, thumbnail };
 }
 
-async function fetchUqloadPage(url: string) {
+async function fetchUqloadPage(url: string, omitReferer = false) {
+  const headers: Record<string, string> = {
+    'User-Agent': BROWSER_USER_AGENT,
+    Accept:
+      'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+  };
+  if (!omitReferer) {
+    headers['Referer'] = 'https://uqload.vc/';
+  }
+
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'User-Agent': BROWSER_USER_AGENT,
-      Referer: 'https://uqload.vc/',
-      Accept:
-        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-    },
+    headers,
     cache: 'no-store',
   });
 
@@ -58,6 +62,11 @@ async function fetchUqloadPage(url: string) {
   }
 
   const html = await response.text();
+
+  // Si devuelve restricción de dominio, retornar nulo para activar el fallback sin referer
+  if (html.includes('Video embed restricted for this domain')) {
+    return { streamingUrl: null, thumbnail: null };
+  }
 
   // 1. Buscar directamente en texto plano en el HTML
   let { streamingUrl, thumbnail } = extractUqloadStreamAndMeta(html);
@@ -84,31 +93,32 @@ export async function resolveUqloadUrl(
   let filecode = (rawFilecode || '').trim();
   if (!filecode && targetUrl) {
     const match = targetUrl.match(
-      /(?:embed-|\/(?:e|v|d|embed)\/)([a-zA-Z0-9_-]+)/i
+      /(?:embed-|\/(?:e|v|d|embed)\/|^https?:\/\/[^\/]+\/)([a-zA-Z0-9_-]+)(?:\.html)?/i
     );
     if (match?.[1]) {
       filecode = match[1];
     }
   }
 
-  // En Uqload, `https://uqload.vc/{filecode}.html` entrega directamente el bloque del reproductor con el `.m3u8?t=...&s=...&e=...`
-  // sin el bloqueo "Video embed restricted for this domain" de `/embed-{code}.html`
-  const directWatchUrl = filecode
-    ? `https://uqload.vc/${filecode}.html`
-    : (targetUrl || '').trim();
   const fallbackEmbedUrl = filecode
-    ? `https://uqload.vc/e/${filecode}`
+    ? `https://uqload.vc/embed-${filecode}.html`
     : (targetUrl || '').trim();
 
-  let { streamingUrl, thumbnail } = await fetchUqloadPage(directWatchUrl);
+  // Ruta 1: Probar embed sin cabecera Referer (elude la protección "Video embed restricted" y "This video can be watched as embed only")
+  let { streamingUrl, thumbnail } = filecode
+    ? await fetchUqloadPage(`https://uqload.vc/embed-${filecode}.html`, true)
+    : { streamingUrl: null, thumbnail: null };
 
-  if (
-    !streamingUrl &&
-    targetUrl &&
-    targetUrl.trim() !== '' &&
-    targetUrl.trim() !== directWatchUrl
-  ) {
-    const fallbackRes = await fetchUqloadPage(targetUrl.trim());
+  // Ruta 2: Fallback a watch url /{filecode}.html
+  if (!streamingUrl && filecode) {
+    const res2 = await fetchUqloadPage(`https://uqload.vc/${filecode}.html`, false);
+    streamingUrl = res2.streamingUrl;
+    if (res2.thumbnail) thumbnail = res2.thumbnail;
+  }
+
+  // Ruta 3: Fallback a targetUrl provisto por el usuario
+  if (!streamingUrl && targetUrl && targetUrl.trim() !== '') {
+    const fallbackRes = await fetchUqloadPage(targetUrl.trim(), true);
     streamingUrl = fallbackRes.streamingUrl;
     if (fallbackRes.thumbnail) {
       thumbnail = fallbackRes.thumbnail;
