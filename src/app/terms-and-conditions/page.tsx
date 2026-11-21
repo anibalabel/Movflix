@@ -13,9 +13,9 @@ import {
 } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Términos y Condiciones (Terms and Conditions) — Dooplex',
+  title: 'Términos y Condiciones (Terms and Conditions) — MovFlix',
   description:
-    'Términos y Condiciones de uso de la plataforma de entretenimiento y streaming Dooplex.',
+    'Términos y Condiciones de uso de la plataforma de entretenimiento y streaming MovFlix.',
 };
 
 export default function TermsAndConditionsPage() {
@@ -40,11 +40,11 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-          Términos y Condiciones de Uso de DooPlex
+          Términos y Condiciones de Uso de MovFlix
         </h1>
 
         <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
-          Bienvenido a <strong>DooPlex</strong>. Al acceder y utilizar nuestro sitio web y
+          Bienvenido a <strong>MovFlix</strong>. Al acceder y utilizar nuestro sitio web y
           aplicación, aceptas cumplir y quedar vinculado por los siguientes Términos y Condiciones
           de uso. Si no estás de acuerdo con alguna parte de estos términos, te recomendamos no
           utilizar nuestros servicios.
@@ -53,7 +53,7 @@ export default function TermsAndConditionsPage() {
         <div className="pt-2 flex flex-wrap items-center gap-4 text-xs text-zinc-400">
           <span>Última actualización: Noviembre 2026</span>
           <span>•</span>
-          <span>Plataforma: DooPlex Web &amp; App</span>
+          <span>Plataforma: MovFlix Web &amp; App</span>
         </div>
       </div>
 
@@ -70,7 +70,7 @@ export default function TermsAndConditionsPage() {
             </h2>
           </div>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            <strong>DooPlex</strong> es un directorio e índice informativo de contenido audiovisual
+            <strong>MovFlix</strong> es un directorio e índice informativo de contenido audiovisual
             (películas, series y animes) con fines exclusivamente de entretenimiento. Nuestra
             plataforma organiza metadatos públicos (sinopsis, pósters, fechas de estreno y
             calificaciones proporcionadas por servicios como TMDB) junto con enlaces de
@@ -89,7 +89,7 @@ export default function TermsAndConditionsPage() {
             </h2>
           </div>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            <strong>DooPlex no aloja, sube, almacena ni distribuye</strong> ningún archivo de video
+            <strong>MovFlix no aloja, sube, almacena ni distribuye</strong> ningún archivo de video
             o multimedia en sus propios servidores. Todos los videos accesibles desde el reproductor
             se encuentran alojados en servicios externos e independientes de terceros (tales como
             Vidara, StreamWish, Doodstream, Streamtape, Filemoon, EarnVids, Uqload, VOE, OK.ru,
@@ -97,7 +97,7 @@ export default function TermsAndConditionsPage() {
           </p>
           <ul className="space-y-2 text-xs sm:text-sm text-zinc-400 pt-1">
             <li>
-              • DooPlex no tiene control sobre el contenido alojado en dichos servidores externos ni
+              • MovFlix no tiene control sobre el contenido alojado en dichos servidores externos ni
               sobre su disponibilidad o legalidad.
             </li>
             <li>
@@ -123,7 +123,7 @@ export default function TermsAndConditionsPage() {
             </h2>
           </div>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            Al utilizar DooPlex, te comprometes a hacer un uso responsable y lícito de la
+            Al utilizar MovFlix, te comprometes a hacer un uso responsable y lícito de la
             plataforma. Queda estrictamente prohibido:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -169,7 +169,7 @@ export default function TermsAndConditionsPage() {
               </h2>
             </div>
             <p className="text-sm text-zinc-300 leading-relaxed">
-              DooPlex se reserva el derecho de modificar, actualizar o suspender temporal o
+              MovFlix se reserva el derecho de modificar, actualizar o suspender temporal o
               permanentemente cualquier sección del catálogo o de estos Términos y Condiciones sin
               previo aviso.
             </p>

@@ -4,9 +4,9 @@ import FooterContactForm from '@/components/FooterContactForm';
 import { ArrowLeft, Mail, MessageSquare, Clock, ShieldCheck } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Contacto y Soporte (Contact Us) — Dooplex',
+  title: 'Contacto y Soporte (Contact Us) — MovFlix',
   description:
-    'Ponte en contacto con el equipo de soporte de Dooplex para reportes técnicos, sugerencias o consultas legales.',
+    'Ponte en contacto con el equipo de soporte de MovFlix para reportes técnicos, sugerencias o consultas legales.',
 };
 
 export default function ContactPage() {
@@ -31,7 +31,7 @@ export default function ContactPage() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-          Contacto y Soporte de DooPlex
+          Contacto y Soporte de MovFlix
         </h1>
 
         <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">

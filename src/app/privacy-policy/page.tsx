@@ -12,9 +12,9 @@ import {
 } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Política de Privacidad (Privacy Policy) — Dooplex',
+  title: 'Política de Privacidad (Privacy Policy) — MovFlix',
   description:
-    'Política de Privacidad y condiciones de uso del servicio de entretenimiento Dooplex.',
+    'Política de Privacidad y condiciones de uso del servicio de entretenimiento MovFlix.',
 };
 
 export default function PrivacyPolicyPage() {
@@ -39,11 +39,11 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-          Política de Privacidad de DooPlex
+          Política de Privacidad de MovFlix
         </h1>
 
         <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
-          Esta Política de Privacidad describe cómo <strong>DooPlex</strong> (&ldquo;nosotros&rdquo;,
+          Esta Política de Privacidad describe cómo <strong>MovFlix</strong> (&ldquo;nosotros&rdquo;,
           &ldquo;nuestra aplicación&rdquo;, &ldquo;la plataforma web&rdquo; o &ldquo;el servicio&rdquo;) maneja la
           información en nuestro servicio de películas, series, animes y televisión.
         </p>
@@ -51,7 +51,7 @@ export default function PrivacyPolicyPage() {
         <div className="pt-2 flex flex-wrap items-center gap-4 text-xs text-zinc-400">
           <span>Última actualización: Noviembre 2026</span>
           <span>•</span>
-          <span>Plataforma: DooPlex Web &amp; App</span>
+          <span>Plataforma: MovFlix Web &amp; App</span>
         </div>
       </div>
 
@@ -68,7 +68,7 @@ export default function PrivacyPolicyPage() {
             </h2>
           </div>
           <p className="text-sm text-zinc-300 leading-relaxed">
-            En <strong>DooPlex</strong> respetamos al máximo tu privacidad. Queremos informar de
+            En <strong>MovFlix</strong> respetamos al máximo tu privacidad. Queremos informar de
             manera transparente a todos nuestros usuarios que:
           </p>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -103,7 +103,7 @@ export default function PrivacyPolicyPage() {
           </div>
           <p className="text-sm text-zinc-300 leading-relaxed">
             Nuestra plataforma <strong>no aloja ningún archivo de video</strong> en servidores
-            propios. DooPlex funciona exclusivamente como un índice automatizado de enlaces y
+            propios. MovFlix funciona exclusivamente como un índice automatizado de enlaces y
             metadatos (apoyado en bases de datos públicas como TMDB) hacia contenido alojado en
             plataformas de terceros, tales como:
           </p>
@@ -150,7 +150,7 @@ export default function PrivacyPolicyPage() {
             <code className="px-1.5 py-0.5 rounded bg-zinc-950 text-zinc-200 text-xs">
               &lt;iframe&gt;
             </code>
-            ) en DooPlex, tu
+            ) en MovFlix, tu
             navegador se conecta con los servidores de video externos seleccionados. Cada proveedor
             externo cuenta con sus propias condiciones y políticas de privacidad (por ejemplo,
             Streamtape, Filemoon, Doodstream, EarnVids o Vidara). Te recomendamos revisar las
@@ -219,7 +219,7 @@ export default function PrivacyPolicyPage() {
           </div>
 
           <p className="text-xs text-zinc-400 pt-2 border-t border-zinc-800/80 leading-relaxed">
-            <strong>Nota Legal:</strong> DooPlex es una plataforma únicamente con fines de
+            <strong>Nota Legal:</strong> MovFlix es una plataforma únicamente con fines de
             entretenimiento. No alojamos archivos protegidos por derechos de autor en nuestros
             servidores ni reclamamos propiedad sobre las marcas, pósters o contenidos disponibles a
             través de plataformas de terceros.

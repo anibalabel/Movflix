@@ -1,5 +1,5 @@
 export const APP_DOWNLOAD_CONFIG = {
-  appName: 'Dooplex',
+  appName: 'MovFlix',
   packageName: 'com.easyplexdocines',
   version: '2.4',
 

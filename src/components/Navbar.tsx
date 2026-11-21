@@ -82,14 +82,14 @@ export default function Navbar() {
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center shadow-lg shadow-red-600/30 group-hover:scale-105 transition">
-                <span className="text-white font-black text-lg tracking-tighter">D</span>
+                <span className="text-white font-black text-lg tracking-tighter">M</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-lg font-extrabold tracking-tight text-white leading-none">
-                  DOO<span className="text-red-500">PLEX</span>
+                  MOV<span className="text-red-500">FLIX</span>
                 </span>
                 <span className="text-[10px] text-zinc-400 font-medium tracking-widest uppercase">
-                  Movflix Streaming
+                  Streaming HD
                 </span>
               </div>
             </Link>

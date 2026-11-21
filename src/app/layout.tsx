@@ -4,9 +4,9 @@ import Navbar from '@/components/Navbar';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Dooplex Streaming — Películas, Series y Animes Online HD',
+  title: 'MovFlix Streaming — Películas, Series y Animes Online HD',
   description:
-    'Disfruta de películas, series y animes en Español Latino, Castellano y Subtitulado en Dooplex.',
+    'Disfruta de películas, series y animes en Español Latino, Castellano y Subtitulado en MovFlix.',
   referrer: 'no-referrer',
 };
 
@@ -27,9 +27,11 @@ export default function RootLayout({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
             <div className="flex flex-wrap items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center text-white font-black text-xs">
-                D
+                M
               </div>
-              <span className="font-bold text-zinc-300">DOOPLEX</span>
+              <span className="font-bold text-zinc-300">
+                MOV<span className="text-red-500">FLIX</span>
+              </span>
               <span>© 2025–{new Date().getFullYear()} Todos los derechos reservados</span>
               <span className="hidden sm:inline">•</span>
               <span className="hidden sm:inline">Películas, Series y Animes Online HD</span>

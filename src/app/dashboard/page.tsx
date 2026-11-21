@@ -35,8 +35,8 @@ const PRESET_AVATARS = [
   'https://api.dicebear.com/9.x/adventurer/svg?seed=Aneka',
   'https://api.dicebear.com/9.x/adventurer/svg?seed=Max',
   'https://api.dicebear.com/9.x/adventurer/svg?seed=Luna',
-  'https://api.dicebear.com/9.x/bottts/svg?seed=Dooplex1',
-  'https://api.dicebear.com/9.x/bottts/svg?seed=Dooplex2',
+  'https://api.dicebear.com/9.x/bottts/svg?seed=MovFlix1',
+  'https://api.dicebear.com/9.x/bottts/svg?seed=MovFlix2',
 ];
 
 export default function UserDashboardPage() {
@@ -301,7 +301,7 @@ export default function UserDashboardPage() {
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                {user.role === 'admin' ? 'Administrador' : 'Miembro Dooplex'}
+                {user.role === 'admin' ? 'Administrador' : 'Miembro MovFlix'}
               </span>
 
               {user.provider_name === 'google' && (
@@ -508,7 +508,7 @@ export default function UserDashboardPage() {
                   Cambiar Contraseña de la Cuenta
                 </h2>
                 <p className="text-xs sm:text-sm text-zinc-400">
-                  Actualiza tu contraseña de acceso en Dooplex
+                  Actualiza tu contraseña de acceso en MovFlix
                 </p>
               </div>
             </div>
@@ -612,7 +612,7 @@ export default function UserDashboardPage() {
                 Mis Favoritos
               </h2>
               <p className="text-xs sm:text-sm text-zinc-400">
-                Películas, series y animes sincronizados con tu cuenta en Dooplex
+                Películas, series y animes sincronizados con tu cuenta en MovFlix
               </p>
             </div>
           </div>

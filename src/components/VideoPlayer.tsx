@@ -551,7 +551,7 @@ export default function VideoPlayer({
 
               <p className="text-xs sm:text-sm text-zinc-300 max-w-md mb-6">
                 Este servidor con extracción directa (Sin Anuncios) solo está
-                disponible para usuarios registrados y logueados en Dooplex.
+                disponible para usuarios registrados y logueados en MovFlix.
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-3">

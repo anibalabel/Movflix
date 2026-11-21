@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
         mode: 'test',
         message:
           missingCoreTables.length === 0
-            ? '¡Conexión exitosa! Se detectaron todas las tablas principales de Dooplex.'
+            ? '¡Conexión exitosa! Se detectaron todas las tablas principales de MovFlix.'
             : `Conexión MySQL exitosa, pero faltan algunas tablas (${missingCoreTables.join(', ')}).`,
         tablesCount: existingTables.length,
         missingCoreTables,

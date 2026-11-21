@@ -232,14 +232,14 @@ export default function LoginModal({
           )}
           <h2 className="text-2xl font-bold text-white">
             {mode === 'login'
-              ? 'Bienvenido a Dooplex'
+              ? 'Bienvenido a MovFlix'
               : mode === 'register'
-              ? 'Crear Cuenta en Dooplex'
+              ? 'Crear Cuenta en MovFlix'
               : 'Recuperar Contraseña'}
           </h2>
           <p className="text-sm text-zinc-400 mt-1">
             {mode === 'login'
-              ? 'Accede con tu cuenta de usuario de Dooplex'
+              ? 'Accede con tu cuenta de usuario de MovFlix'
               : mode === 'register'
               ? 'Regístrate gratis en segundos para acceder a la plataforma'
               : forgotStep === 'verify'

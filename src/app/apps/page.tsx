@@ -79,7 +79,7 @@ export default function AppsDownloadPage() {
           <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold tracking-wider uppercase shadow-sm">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Aplicaciones Oficiales Dooplex</span>
+              <span>Aplicaciones Oficiales MovFlix</span>
             </div>
 
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.08]">
@@ -180,10 +180,10 @@ export default function AppsDownloadPage() {
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center text-white font-black text-xs">
-                      D
+                      M
                     </div>
                     <span className="text-xs font-extrabold tracking-wider text-white">
-                      DOO<span className="text-red-500">PLEX</span>{' '}
+                      MOV<span className="text-red-500">FLIX</span>{' '}
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 ml-1">
                         ANDROID TV
                       </span>
@@ -249,7 +249,7 @@ export default function AppsDownloadPage() {
                     <Smartphone className="w-3 h-3 text-zinc-400" />
                   </div>
                   <div className="text-xs font-extrabold text-white leading-tight">
-                    Dooplex App
+                    MovFlix App
                   </div>
                   <div className="text-[9px] text-emerald-400 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-2.5 h-2.5" /> Play Store Oficial
@@ -325,7 +325,7 @@ export default function AppsDownloadPage() {
                         Escanea con la cámara de tu móvil
                       </div>
                       <p className="text-xs text-zinc-400">
-                        Te llevará directamente a la ficha oficial de <strong>Dooplex</strong> en la tienda Google Play Store.
+                        Te llevará directamente a la ficha oficial de <strong>MovFlix</strong> en la tienda Google Play Store.
                       </p>
                     </div>
                   </div>

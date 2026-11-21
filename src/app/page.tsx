@@ -83,7 +83,7 @@ export default function HomePage() {
       <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
         <p className="text-zinc-400 text-sm font-medium">
-          Cargando catálogo de Dooplex...
+          Cargando catálogo de MovFlix...
         </p>
       </div>
     );
@@ -148,7 +148,7 @@ export default function HomePage() {
             <div className="max-w-2xl space-y-4">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <span className="px-3 py-1 rounded-full bg-red-600 text-white text-xs font-bold uppercase tracking-wider shadow-lg shadow-red-600/30">
-                  Destacado Dooplex
+                  Destacado MovFlix
                 </span>
                 <span className="px-2.5 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-zinc-200 text-xs font-semibold uppercase">
                   {activeHero.mediaType === 'movies'

@@ -108,7 +108,7 @@ function CatalogContent() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-zinc-800/80">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Catálogo Completo Dooplex
+            Catálogo Completo MovFlix
           </h1>
           <p className="text-sm text-zinc-400 mt-1">
             Explora {total.toLocaleString()}{' '}

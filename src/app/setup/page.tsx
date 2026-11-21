@@ -409,7 +409,7 @@ export default function SetupPage() {
                 required
                 value={database}
                 onChange={(e) => setDatabase(e.target.value)}
-                placeholder="Ej: dooplex_db"
+                placeholder="Ej: movflix_db"
                 className="w-full rounded-xl bg-zinc-950 border border-zinc-800 pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 transition"
               />
             </div>

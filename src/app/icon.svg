@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="movflixBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dc2626" />
+      <stop offset="100%" stop-color="#be123c" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#movflixBg)" />
+  <path
+    d="M15 47V17h7.5l9.5 16.2L41.5 17H49v30h-6.8V28.4L34 41.8h-4L21.8 28.4V47H15z"
+    fill="#ffffff"
+  />
+</svg>

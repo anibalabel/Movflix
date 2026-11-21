@@ -575,7 +575,7 @@ export default function RequestsAndSuggestionsPanel() {
                             href={`/watch/${watchPath}/${req.created_media_id}`}
                             className="inline-block text-xs font-bold text-red-400 hover:text-red-300 hover:underline pt-0.5"
                           >
-                            Ver ahora en Dooplex →
+                            Ver ahora en MovFlix →
                           </Link>
                         )}
                       </div>
