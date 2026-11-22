@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cookie": "0.7.2",
     "hls.js": "^1.7.4",
     "lucide-react": "^1.69.0",
     "mysql2": "^3.24.6",
@@ -25,5 +26,8 @@
     "postcss": "^8.5.32",
     "tailwindcss": "^4.3.4",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "cookie": "$cookie"
   }
 }
