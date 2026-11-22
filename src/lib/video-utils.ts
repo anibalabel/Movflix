@@ -25,6 +25,7 @@ export interface NormalizedVideoLink extends RawVideoLink {
     | 'streamwish'
     | 'uqload'
     | 'earnvids'
+    | 'streamtape'
     | 'hls'
     | 'mp4'
     | 'youtube'
@@ -34,8 +35,22 @@ export interface NormalizedVideoLink extends RawVideoLink {
   streamwishFilecode: string | null;
   uqloadFilecode: string | null;
   earnvidsFilecode: string | null;
+  streamtapeFilecode: string | null;
   requiresAuth: boolean;
 }
+
+const STREAMTAPE_HOST_KEYWORDS = [
+  'streamtape',
+  'gettapeads',
+  'tapewithadblock',
+  'tapeadsenjoyer',
+  'adblocktape',
+  'watchadsontape',
+  'shavetapeads',
+  'antiadtape',
+  'streamta.pe',
+  'stape.',
+];
 
 const EARNVIDS_HOST_KEYWORDS = [
   'earnvids',
@@ -96,6 +111,15 @@ const KNOWN_SERVERS: Record<string, string> = {
   dr0pstream: 'DropLoad',
   player4me: 'Player4Me',
   streamtape: 'Streamtape',
+  gettapeads: 'Streamtape',
+  tapewithadblock: 'Streamtape',
+  tapeadsenjoyer: 'Streamtape',
+  adblocktape: 'Streamtape',
+  watchadsontape: 'Streamtape',
+  shavetapeads: 'Streamtape',
+  antiadtape: 'Streamtape',
+  'streamta.pe': 'Streamtape',
+  'stape.': 'Streamtape',
   vidsonic: 'Vidsonic',
   vidsrc: 'VidSrc',
   moviepire: 'VidSrc',
@@ -380,6 +404,45 @@ export function extractEarnVidsFilecode(
 }
 
 /**
+ * Extrae el filecode de Streamtape o cualquiera de sus dominios espejo
+ * (ej. https://streamtape.com/e/ABCD1234 o https://gettapeads.com/v/ABCD1234 -> "ABCD1234")
+ */
+export function extractStreamtapeFilecode(
+  link: string,
+  rawServer?: string | null,
+  rawHeader?: string | null
+): string | null {
+  const trimmed = (link || '').trim();
+  if (!trimmed) return null;
+
+  let isStreamtapeDomain = false;
+  try {
+    const url = new URL(trimmed);
+    const host = url.hostname.toLowerCase();
+    if (STREAMTAPE_HOST_KEYWORDS.some((kw) => host.includes(kw))) {
+      isStreamtapeDomain = true;
+    }
+  } catch {
+    // ignore
+  }
+
+  const combined = `${rawHeader || ''} ${rawServer || ''} ${trimmed}`.toLowerCase();
+  if (
+    !isStreamtapeDomain &&
+    !STREAMTAPE_HOST_KEYWORDS.some((kw) => combined.includes(kw))
+  ) {
+    return null;
+  }
+
+  const pathMatch = trimmed.match(/\/(?:e|v|embed|d)\/([a-zA-Z0-9_-]+)/i);
+  if (pathMatch?.[1] && pathMatch[1].toLowerCase() !== 'e') {
+    return pathMatch[1];
+  }
+
+  return null;
+}
+
+/**
  * Normaliza enlaces de servidores embed como Vidara que en la BD vienen con `/v/`
  * (ej. https://vidara.so/v/qo1LOLLEEEw3i -> https://vidara.so/e/qo1LOLLEEEw3i)
  */
@@ -429,6 +492,11 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     video.server,
     video.header
   );
+  const streamtapeFilecode = extractStreamtapeFilecode(
+    rawLink,
+    video.server,
+    video.header
+  );
 
   const isHlsFlag = Number(video.hls) === 1;
   const isYoutubeFlag = Number(video.youtubelink) === 1;
@@ -452,6 +520,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     | 'streamwish'
     | 'uqload'
     | 'earnvids'
+    | 'streamtape'
     | 'hls'
     | 'mp4'
     | 'youtube'
@@ -459,7 +528,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
   let playbackUrl = link;
 
   // Regla principal de `supported_hosts`:
-  // Solo si `supported_hosts == 1` está activo intentamos usar los extractores propios implementados (Vidara, StreamWish, Uqload y EarnVids).
+  // Solo si `supported_hosts == 1` está activo intentamos usar los extractores propios implementados (Vidara, StreamWish, Uqload, EarnVids y Streamtape).
   if (isSupportedHostFlag) {
     if (vidaraFilecode) {
       playerType = 'vidara';
@@ -472,6 +541,9 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     } else if (earnvidsFilecode) {
       playerType = 'earnvids';
       playbackUrl = `https://morencius.com/embed/${earnvidsFilecode}`;
+    } else if (streamtapeFilecode) {
+      playerType = 'streamtape';
+      playbackUrl = `https://streamtape.com/e/${streamtapeFilecode}`;
     } else {
       playerType = 'embed';
     }
@@ -510,6 +582,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     streamwishFilecode,
     uqloadFilecode,
     earnvidsFilecode,
+    streamtapeFilecode,
     // Los videos con `supported_hosts == 1` requieren que el usuario esté registrado y logueado
     requiresAuth: isSupportedHostFlag,
   };

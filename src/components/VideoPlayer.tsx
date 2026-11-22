@@ -128,7 +128,7 @@ export default function VideoPlayer({
     );
   }, [currentLangVideos, selectedVideoId]);
 
-  // Resolve Vidara, StreamWish or Uqload direct streaming_url and thumbnail when activeVideo is 'vidara', 'streamwish' or 'uqload'
+  // Resolve Vidara, StreamWish, Uqload, EarnVids or Streamtape direct streaming_url and thumbnail
   useEffect(() => {
     const isVidara =
       activeVideo?.playerType === 'vidara' && Boolean(activeVideo?.vidaraFilecode);
@@ -141,10 +141,13 @@ export default function VideoPlayer({
     const isEarnVids =
       activeVideo?.playerType === 'earnvids' &&
       Boolean(activeVideo?.earnvidsFilecode);
+    const isStreamtape =
+      activeVideo?.playerType === 'streamtape' &&
+      Boolean(activeVideo?.streamtapeFilecode);
 
     if (
       !activeVideo ||
-      (!isVidara && !isStreamWish && !isUqload && !isEarnVids) ||
+      (!isVidara && !isStreamWish && !isUqload && !isEarnVids && !isStreamtape) ||
       (activeVideo.requiresAuth && !isAuthenticated)
     ) {
       setVidaraInfo(null);
@@ -164,7 +167,9 @@ export default function VideoPlayer({
       ? '/api/streamwish'
       : isUqload
       ? '/api/uqload'
-      : '/api/earnvids';
+      : isEarnVids
+      ? '/api/earnvids'
+      : '/api/streamtape';
     const filecode =
       (isVidara
         ? activeVideo.vidaraFilecode
@@ -172,7 +177,9 @@ export default function VideoPlayer({
         ? activeVideo.streamwishFilecode
         : isUqload
         ? activeVideo.uqloadFilecode
-        : activeVideo.earnvidsFilecode) || '';
+        : isEarnVids
+        ? activeVideo.earnvidsFilecode
+        : activeVideo.streamtapeFilecode) || '';
     const payload = isVidara
       ? { filecode }
       : {
@@ -240,7 +247,8 @@ export default function VideoPlayer({
       (activeVideo.playerType === 'vidara' ||
         activeVideo.playerType === 'streamwish' ||
         activeVideo.playerType === 'uqload' ||
-        activeVideo.playerType === 'earnvids') &&
+        activeVideo.playerType === 'earnvids' ||
+        activeVideo.playerType === 'streamtape') &&
       vidaraStarted &&
       vidaraInfo?.streaming_url &&
       vidaraInfo.streaming_url.toLowerCase().includes('.m3u8')
@@ -501,7 +509,8 @@ export default function VideoPlayer({
                     {video.playerType === 'vidara' ||
                     video.playerType === 'streamwish' ||
                     video.playerType === 'uqload' ||
-                    video.playerType === 'earnvids'
+                    video.playerType === 'earnvids' ||
+                    video.playerType === 'streamtape'
                       ? 'DIRECTO'
                       : video.playerType === 'hls'
                       ? 'HLS'
@@ -585,17 +594,18 @@ export default function VideoPlayer({
             </div>
           ) : (
             <>
-              {/* Mode 0: Vidara, StreamWish & Uqload Direct Stream with Pre-Play Thumbnail Cover */}
+              {/* Mode 0: Vidara, StreamWish, Uqload, EarnVids & Streamtape Direct Stream with Pre-Play Thumbnail Cover */}
             {(activeVideo.playerType === 'vidara' ||
               activeVideo.playerType === 'streamwish' ||
               activeVideo.playerType === 'uqload' ||
-              activeVideo.playerType === 'earnvids') && (
+              activeVideo.playerType === 'earnvids' ||
+              activeVideo.playerType === 'streamtape') && (
               <>
                 {vidaraLoading ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 gap-3">
                     <div className="w-11 h-11 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
                     <p className="text-xs sm:text-sm text-zinc-400">
-                      Extrayendo stream directo .m3u8 de {activeVideo.serverLabel}...
+                      Extrayendo stream directo de {activeVideo.serverLabel}...
                     </p>
                   </div>
                 ) : vidaraInfo?.streaming_url ? (
@@ -647,6 +657,15 @@ export default function VideoPlayer({
                       autoPlay
                       playsInline
                       poster={vidaraInfo.thumbnail || backdropUrl || undefined}
+                      onError={() => {
+                        console.warn(
+                          '[VideoPlayer] Error reproduciendo MP4 directo, cambiando a embed fallback:',
+                          vidaraInfo.streaming_url
+                        );
+                        setVidaraInfo((prev) =>
+                          prev ? { ...prev, streaming_url: null } : null
+                        );
+                      }}
                       className="w-full h-full object-contain bg-black"
                     />
                   )
@@ -725,10 +744,13 @@ export default function VideoPlayer({
               {(activeVideo.playerType === 'vidara' ||
                 activeVideo.playerType === 'streamwish' ||
                 activeVideo.playerType === 'uqload' ||
-                activeVideo.playerType === 'earnvids') &&
+                activeVideo.playerType === 'earnvids' ||
+                activeVideo.playerType === 'streamtape') &&
                 vidaraInfo?.streaming_url && (
                   <span className="ml-2 text-emerald-400 font-semibold">
-                    • Stream Directo HLS
+                    {vidaraInfo.streaming_url.toLowerCase().includes('.m3u8')
+                      ? '• Stream Directo HLS'
+                      : '• Stream Directo MP4'}
                   </span>
                 )}
             </span>
