@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/db';
+import { buildSignedProxyUrl } from '@/lib/earnvids-manifest';
 
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36';
@@ -34,15 +35,12 @@ function isAllowedStreamtapeUrl(rawUrl: string): boolean {
   }
 }
 
-/**
- * Evalúa concatenaciones simples de literales JS + `.substring(...)` usadas por Streamtape
- * (p. ej. `"//streamtape.com/get_video?id=..." + ('xcdtoken=abc').substring(3)`).
- */
-function evaluateStreamtapeJsConcat(expr: string): string | null {
+function splitTopLevelPlus(expr: string): string[] {
   const parts: string[] = [];
   let current = '';
   let quote: '"' | "'" | null = null;
   let escaped = false;
+  let depth = 0;
 
   for (let i = 0; i < expr.length; i++) {
     const ch = expr[i];
@@ -61,65 +59,159 @@ function evaluateStreamtapeJsConcat(expr: string): string | null {
       current += ch;
       continue;
     }
-    if (ch === '+' && !quote) {
-      parts.push(current.trim());
-      current = '';
-      continue;
+    if (!quote) {
+      if (ch === '(') depth++;
+      else if (ch === ')' && depth > 0) depth--;
+      else if (ch === '+' && depth === 0) {
+        parts.push(current.trim());
+        current = '';
+        continue;
+      }
     }
     current += ch;
   }
   if (current.trim()) {
     parts.push(current.trim());
   }
-  if (parts.length === 0) return null;
-
-  let output = '';
-  for (const part of parts) {
-    const termMatch = part.match(
-      /^(?:\(\s*)?(['"])((?:\\.|[^\\])*?)\1(?:\s*\))?((?:\s*\.\s*substring\(\s*\d+(?:\s*,\s*\d+)?\s*\))*)$/
-    );
-    if (!termMatch) {
-      return null;
-    }
-
-    let literal = termMatch[2]
-      .replace(/\\(['"\\])/g, '$1')
-      .replace(/\\\//g, '/');
-
-    const subCalls = termMatch[3] || '';
-    const subRegex = /\.substring\(\s*(\d+)(?:\s*,\s*(\d+))?\s*\)/g;
-    let subMatch: RegExpExecArray | null;
-    while ((subMatch = subRegex.exec(subCalls)) !== null) {
-      const start = Number(subMatch[1]);
-      const end = subMatch[2] !== undefined ? Number(subMatch[2]) : undefined;
-      literal = literal.substring(start, end);
-    }
-
-    output += literal;
-  }
-
-  return output || null;
+  return parts;
 }
 
-function normalizeGetVideoUrl(rawPartial: string): string {
-  let finalUrl = `https://${rawPartial
+/**
+ * Evalúa recursivamente concatenaciones de literales JS + `.substring(...)` / `.slice(...)`
+ * (incluyendo paréntesis anidados usados por Streamtape en `innerHTML = ...`).
+ */
+function evaluateStreamtapeJsExpr(rawExpr: string): string | null {
+  const expr = rawExpr.trim();
+  if (!expr) return null;
+
+  const parts = splitTopLevelPlus(expr);
+  if (parts.length > 1) {
+    let out = '';
+    for (const part of parts) {
+      const val = evaluateStreamtapeJsExpr(part);
+      if (val === null) return null;
+      out += val;
+    }
+    return out;
+  }
+
+  // Verificar si termina en cadena de `.substring(...)` / `.slice(...)` sobre paréntesis `(subExpr)`
+  if (expr.startsWith('(')) {
+    let depth = 0;
+    let quote: '"' | "'" | null = null;
+    let escaped = false;
+    let closeIdx = -1;
+
+    for (let i = 0; i < expr.length; i++) {
+      const ch = expr[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\' && quote) {
+        escaped = true;
+        continue;
+      }
+      if ((ch === '"' || ch === "'") && (!quote || quote === ch)) {
+        quote = quote === ch ? null : ch;
+        continue;
+      }
+      if (!quote) {
+        if (ch === '(') depth++;
+        else if (ch === ')') {
+          depth--;
+          if (depth === 0) {
+            closeIdx = i;
+            break;
+          }
+        }
+      }
+    }
+
+    if (closeIdx > 0) {
+      const inner = expr.slice(1, closeIdx);
+      const tail = expr.slice(closeIdx + 1).trim();
+      let baseVal = evaluateStreamtapeJsExpr(inner);
+      if (baseVal === null) return null;
+
+      if (tail) {
+        const calls = tail.match(
+          /^(?:\s*\.\s*(?:substring|slice)\(\s*\d+(?:\s*,\s*\d+)?\s*\))+$/
+        );
+        if (!calls) return null;
+        const callRegex =
+          /\.\s*(substring|slice)\(\s*(\d+)(?:\s*,\s*(\d+))?\s*\)/g;
+        let m: RegExpExecArray | null;
+        while ((m = callRegex.exec(tail)) !== null) {
+          const fn = m[1];
+          const a = Number(m[2]);
+          const b = m[3] !== undefined ? Number(m[3]) : undefined;
+          baseVal = fn === 'slice' ? baseVal.slice(a, b) : baseVal.substring(a, b);
+        }
+      }
+      return baseVal;
+    }
+  }
+
+  const litMatch = expr.match(
+    /^(['"])((?:\\.|[^\\])*?)\1((?:\s*\.\s*(?:substring|slice)\(\s*\d+(?:\s*,\s*\d+)?\s*\))*)$/
+  );
+  if (!litMatch) return null;
+
+  let literal = litMatch[2]
+    .replace(/\\(['"\\])/g, '$1')
+    .replace(/\\\//g, '/');
+
+  const tail = litMatch[3] || '';
+  if (tail) {
+    const callRegex = /\.\s*(substring|slice)\(\s*(\d+)(?:\s*,\s*(\d+))?\s*\)/g;
+    let m: RegExpExecArray | null;
+    while ((m = callRegex.exec(tail)) !== null) {
+      const fn = m[1];
+      const a = Number(m[2]);
+      const b = m[3] !== undefined ? Number(m[3]) : undefined;
+      literal = fn === 'slice' ? literal.slice(a, b) : literal.substring(a, b);
+    }
+  }
+
+  return literal;
+}
+
+function normalizeBaseGetVideoUrl(rawPartial: string): string {
+  return `https://${rawPartial
     .trim()
     .replace(/^https?:\/\//i, '')
     .replace(/^\/+/, '')}`;
-  if (!/[?&]dl=1(?:&|$)/i.test(finalUrl)) {
-    finalUrl += finalUrl.includes('?') ? '&dl=1' : '?dl=1';
-  }
-  return finalUrl;
 }
 
-function extractStreamtapeStreamAndMeta(html: string): {
-  streamingUrl: string | null;
+function withQueryParam(url: string, key: string, value: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set(key, value);
+    return parsed.toString();
+  } catch {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}${key}=${value}`;
+  }
+}
+
+function extractStreamtapeCandidatesAndMeta(html: string): {
+  candidateVideoUrls: string[];
   thumbnail: string | null;
 } {
-  let streamingUrl: string | null = null;
   let thumbnail: string | null = null;
+  const candidateVideoUrls: string[] = [];
 
-  // Extraer miniatura del tag <video id="mainvideo" poster="..."> o metadatos
+  const pushVideo = (rawUrl: string | null) => {
+    if (!rawUrl) return;
+    const base = normalizeBaseGetVideoUrl(rawUrl);
+    if (!base.includes('get_video') || !base.includes('token=')) return;
+    if (!candidateVideoUrls.includes(base)) {
+      candidateVideoUrls.push(base);
+    }
+  };
+
+  // Miniatura
   const posterMatch =
     html.match(/<video[^>]+poster=["'](https?:\/\/[^"']+)["']/i) ||
     html.match(
@@ -130,94 +222,194 @@ function extractStreamtapeStreamAndMeta(html: string): {
     thumbnail = posterMatch[1];
   }
 
-  // Paso 1: localizar elemento oculto (*link) y su parte inicial hasta `token=`
-  const elemMatch =
-    html.match(
-      /id=["']([^"']+link)["'][^>]*style=["'][^"']*display:\s*none;?[^"']*["'][^>]*>([^<]*)/i
-    ) ||
-    html.match(
-      /style=["'][^"']*display:\s*none;?[^"']*["'][^>]*id=["']([^"']+link)["'][^>]*>([^<]*)/i
-    );
+  // 1. Recolectar asignaciones JS `document.getElementById(...).innerHTML = ...`
+  // En Streamtape suele haber señuelos (`botlink`) y el real (`norobotlink`, `ideoooolink`, `robotlink`).
+  const innerHtmlMatches = Array.from(
+    html.matchAll(
+      /document\.getElementById\(\s*['"]([a-zA-Z0-9_-]*link)['"]\s*\)\.innerHTML\s*=\s*([^;\r\n]+)/gi
+    )
+  );
 
-  const linkId = elemMatch?.[1] || null;
-  const hiddenInner = elemMatch?.[2] || '';
-  const part1Match = hiddenInner.match(/(.*?token=)[^&<]*/i);
+  // Guardar la última asignación de cada ID respetando prioridad (norobotlink > ideoooolink > robotlink > otros no-botlink)
+  const exprById = new Map<string, string>();
+  for (const m of innerHtmlMatches) {
+    exprById.set(m[1], m[2]);
+  }
 
-  // Paso 2A: evaluar expresión JS completa `document.getElementById(id).innerHTML = "..." + ('...').substring(...)`
-  const candidateIds = linkId
-    ? [linkId]
-    : ['robotlink', 'norobotlink', 'ideoooolink'];
-  for (const id of candidateIds) {
-    const rhsRegex = new RegExp(
-      `document\\.getElementById\\(\\s*['"]${escapeRegex(id)}['"]\\s*\\)\\.innerHTML\\s*=\\s*([^;\\r\\n]+)`,
-      'i'
-    );
-    const rhsMatch = html.match(rhsRegex);
-    if (rhsMatch?.[1]) {
-      const evaluated = evaluateStreamtapeJsConcat(rhsMatch[1]);
-      if (
-        evaluated &&
-        evaluated.includes('get_video') &&
-        evaluated.includes('token=')
-      ) {
-        streamingUrl = normalizeGetVideoUrl(evaluated);
-        break;
-      }
+  const orderedIds = Array.from(exprById.keys()).sort((a, b) => {
+    const rank = (id: string) => {
+      const low = id.toLowerCase();
+      if (low === 'norobotlink') return 0;
+      if (low === 'ideoooolink') return 1;
+      if (low === 'robotlink') return 2;
+      if (low === 'botlink') return 9;
+      return 3;
+    };
+    return rank(a) - rank(b);
+  });
+
+  for (const id of orderedIds) {
+    const rhs = exprById.get(id);
+    if (!rhs) continue;
+    const evaluated = evaluateStreamtapeJsExpr(rhs);
+    if (evaluated) {
+      pushVideo(evaluated);
     }
   }
 
-  // Paso 2B: reconstrucción directa part1 (HTML) + part2 (token=... en script), idéntica al extractor base
-  if (!streamingUrl && linkId && part1Match?.[1]) {
-    const escapedId = escapeRegex(linkId);
+  // 2. Fallback Kotlin 2 pasos por cada <div id="...link" style="display:none;">...token=...</div>
+  const elemMatches = html.matchAll(
+    /id=["']([^"']+link)["'][^>]*style=["'][^"']*display:\s*none;?[^"']*["'][^>]*>([^<]*)/gi
+  );
+  for (const elem of elemMatches) {
+    const linkId = elem[1];
+    if (linkId.toLowerCase() === 'botlink') continue;
+    const part1Match = elem[2].match(/(.*?token=)[^&<]*/i);
+    if (!part1Match?.[1]) continue;
+
     const tokenRegex = new RegExp(
-      `document\\.getElementById\\(\\s*['"]${escapedId}['"]\\s*\\)\\.innerHTML\\s*=\\s*.*?token=([\\w-]+)`,
-      'i'
+      `document\\.getElementById\\(\\s*['"]${escapeRegex(linkId)}['"]\\s*\\)\\.innerHTML\\s*=\\s*.*?token=([\\w-]+)`,
+      'gi'
     );
-    const tokenMatch = html.match(tokenRegex);
-    if (tokenMatch?.[1]) {
-      streamingUrl = normalizeGetVideoUrl(`${part1Match[1]}${tokenMatch[1]}`);
+    const tokens = Array.from(html.matchAll(tokenRegex));
+    const lastToken = tokens[tokens.length - 1]?.[1];
+    if (lastToken) {
+      pushVideo(`${part1Match[1]}${lastToken}`);
     }
   }
 
-  return { streamingUrl, thumbnail };
+  return { candidateVideoUrls, thumbnail };
 }
 
-async function resolveRedirectLocation(
-  videoUrl: string,
-  referer: string
-): Promise<string> {
+function extractCookieHeader(response: Response): string {
+  const hdrs = response.headers as unknown as {
+    getSetCookie?: () => string[];
+  };
+  const list =
+    typeof hdrs.getSetCookie === 'function'
+      ? hdrs.getSetCookie()
+      : response.headers.get('set-cookie')
+      ? [response.headers.get('set-cookie')!]
+      : [];
+  return list
+    .map((c) => c.split(';')[0]?.trim())
+    .filter(Boolean)
+    .join('; ');
+}
+
+async function verifyVideoUrlReachable(
+  url: string,
+  referer: string,
+  cookieHeader: string
+): Promise<boolean> {
   try {
-    const res = await fetch(videoUrl, {
+    const headers: Record<string, string> = {
+      'User-Agent': BROWSER_USER_AGENT,
+      Referer: referer,
+      Range: 'bytes=0-15',
+    };
+    if (cookieHeader) {
+      headers.Cookie = cookieHeader;
+    }
+
+    const res = await fetch(url, {
       method: 'GET',
-      redirect: 'manual',
-      headers: {
-        'User-Agent': BROWSER_USER_AGENT,
-        Referer: referer,
-      },
+      headers,
+      redirect: 'follow',
       cache: 'no-store',
     });
-    res.body?.cancel().catch(() => {});
 
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get('location');
-      if (location) {
-        const resolved = new URL(location, videoUrl).toString();
-        if (
-          resolved.startsWith('https://') &&
-          !resolved.toLowerCase().includes('/404')
-        ) {
-          return resolved;
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (!res.ok || ct.includes('text/html') || ct.includes('application/json')) {
+      res.body?.cancel().catch(() => {});
+      return false;
+    }
+
+    // Leer el primer chunk corto para descartar JSON `{"status":403,"msg":"Access Denied"}` disfrazado sin Content-Type
+    const reader = res.body?.getReader();
+    if (reader) {
+      const { value } = await reader.read();
+      reader.cancel().catch(() => {});
+      if (value && value.length > 0 && value[0] === 0x7b) {
+        const preview = Buffer.from(value.slice(0, 64)).toString('utf8');
+        if (preview.includes('"status":403') || preview.includes('Access Denied')) {
+          return false;
         }
       }
     }
+
+    return true;
   } catch {
-    // Mantener la URL get_video construida si falla la resolución previa de redirección
+    return false;
   }
-  return videoUrl;
+}
+
+async function resolvePlayableStreamtapeTarget(
+  baseGetVideoUrl: string,
+  referer: string,
+  cookieHeader: string
+): Promise<{ resolvedUrl: string; needsCookie: boolean } | null> {
+  const probeUrls = [
+    withQueryParam(baseGetVideoUrl, 'stream', '1'),
+    withQueryParam(baseGetVideoUrl, 'dl', '1'),
+    baseGetVideoUrl,
+  ];
+
+  for (const probeUrl of Array.from(new Set(probeUrls))) {
+    try {
+      const headers: Record<string, string> = {
+        'User-Agent': BROWSER_USER_AGENT,
+        Referer: referer,
+      };
+      if (cookieHeader) {
+        headers.Cookie = cookieHeader;
+      }
+
+      const res = await fetch(probeUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        headers,
+        cache: 'no-store',
+      });
+
+      if (res.status >= 300 && res.status < 400) {
+        res.body?.cancel().catch(() => {});
+        const location = res.headers.get('location');
+        if (location) {
+          const cdnUrl = new URL(location, probeUrl).toString();
+          if (
+            cdnUrl.startsWith('https://') &&
+            !cdnUrl.toLowerCase().includes('/404')
+          ) {
+            if (await verifyVideoUrlReachable(cdnUrl, referer, '')) {
+              return { resolvedUrl: cdnUrl, needsCookie: false };
+            }
+            if (
+              cookieHeader &&
+              (await verifyVideoUrlReachable(cdnUrl, referer, cookieHeader))
+            ) {
+              return { resolvedUrl: cdnUrl, needsCookie: true };
+            }
+          }
+        }
+        continue;
+      }
+
+      res.body?.cancel().catch(() => {});
+      if (await verifyVideoUrlReachable(probeUrl, referer, cookieHeader)) {
+        return { resolvedUrl: probeUrl, needsCookie: Boolean(cookieHeader) };
+      }
+    } catch {
+      // Probar siguiente variante (stream=1 / dl=1)
+    }
+  }
+
+  return null;
 }
 
 async function fetchStreamtapePage(embedUrl: string): Promise<{
   streamingUrl: string | null;
+  directUrl: string | null;
   thumbnail: string | null;
   status: number;
   finalUrl: string;
@@ -239,30 +431,51 @@ async function fetchStreamtapePage(embedUrl: string): Promise<{
   if (!response.ok) {
     return {
       streamingUrl: null,
+      directUrl: null,
       thumbnail: null,
       status: response.status,
       finalUrl,
     };
   }
 
+  const cookieHeader = extractCookieHeader(response);
   const html = await response.text();
-  const { streamingUrl, thumbnail } = extractStreamtapeStreamAndMeta(html);
-  const resolvedUrl = streamingUrl
-    ? await resolveRedirectLocation(streamingUrl, finalUrl)
-    : null;
+  const { candidateVideoUrls, thumbnail } = extractStreamtapeCandidatesAndMeta(html);
+
+  for (const candidateUrl of candidateVideoUrls) {
+    const playable = await resolvePlayableStreamtapeTarget(
+      candidateUrl,
+      finalUrl,
+      cookieHeader
+    );
+    if (playable) {
+      const proxiedUrl = buildSignedProxyUrl(
+        '/api/streamtape/stream',
+        playable.resolvedUrl,
+        finalUrl,
+        21600,
+        playable.needsCookie ? cookieHeader : ''
+      );
+      return {
+        streamingUrl: proxiedUrl,
+        directUrl: playable.resolvedUrl,
+        thumbnail,
+        status: response.status,
+        finalUrl,
+      };
+    }
+  }
 
   return {
-    streamingUrl: resolvedUrl,
+    streamingUrl: null,
+    directUrl: null,
     thumbnail,
     status: response.status,
     finalUrl,
   };
 }
 
-async function resolveStreamtapeUrl(
-  targetUrl?: string,
-  rawFilecode?: string
-) {
+async function resolveStreamtapeUrl(targetUrl?: string, rawFilecode?: string) {
   let filecode = (rawFilecode || '').trim();
 
   if (!filecode && targetUrl) {
@@ -293,6 +506,7 @@ async function resolveStreamtapeUrl(
   }
 
   let streamingUrl: string | null = null;
+  let directUrl: string | null = null;
   let thumbnail: string | null = null;
   let usedEmbed = primaryEmbed;
 
@@ -304,6 +518,7 @@ async function resolveStreamtapeUrl(
       }
       if (res.streamingUrl) {
         streamingUrl = res.streamingUrl;
+        directUrl = res.directUrl;
         usedEmbed = res.finalUrl || candidate;
         break;
       }
@@ -316,6 +531,7 @@ async function resolveStreamtapeUrl(
     filecode: filecode || null,
     embed_url: usedEmbed,
     streaming_url: streamingUrl,
+    ...(directUrl ? { direct_url: directUrl } : {}),
     thumbnail,
     fallback_embed: primaryEmbed || usedEmbed,
   };

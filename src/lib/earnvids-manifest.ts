@@ -7,10 +7,18 @@ function getManifestSecret(): string {
   return process.env.JWT_SECRET || 'dooplex-earnvids-manifest-secret-2026';
 }
 
-function signPayload(targetUrl: string, referer: string, exp: number): string {
+function signPayload(
+  targetUrl: string,
+  referer: string,
+  exp: number,
+  extra = ''
+): string {
+  const payload = extra
+    ? `${targetUrl}|${referer}|${extra}|${exp}`
+    : `${targetUrl}|${referer}|${exp}`;
   return crypto
     .createHmac('sha256', getManifestSecret())
-    .update(`${targetUrl}|${referer}|${exp}`)
+    .update(payload)
     .digest('base64url');
 }
 
@@ -42,29 +50,35 @@ export function isAllowedHttpsUrl(rawUrl: string): boolean {
   }
 }
 
-/** Construye una URL proxy firmada en nuestro dominio para servir playlists .m3u8 con CORS `*`. */
-export function buildSignedManifestProxyUrl(
+/** Construye una URL proxy firmada en el endpoint especificado. */
+export function buildSignedProxyUrl(
+  routePath: string,
   targetUrl: string,
   referer: string,
-  ttlSeconds = 21600
+  ttlSeconds = 21600,
+  extra = ''
 ): string {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
-  const sig = signPayload(targetUrl, referer, exp);
+  const sig = signPayload(targetUrl, referer, exp, extra);
   const params = new URLSearchParams({
     url: targetUrl,
     ref: referer,
     exp: String(exp),
     sig,
   });
-  return `/api/earnvids/manifest?${params.toString()}`;
+  if (extra) {
+    params.set('ex', extra);
+  }
+  return `${routePath}?${params.toString()}`;
 }
 
-/** Verifica firma HMAC, vigencia temporal y protocolo seguro antes de hacer fetch. */
-export function verifySignedManifestParams(
+/** Verifica firma HMAC, vigencia temporal y protocolo HTTPS público. */
+export function verifySignedProxyParams(
   targetUrl: string,
   referer: string,
   expStr: string,
-  sig: string
+  sig: string,
+  extra = ''
 ): boolean {
   if (!targetUrl || !referer || !expStr || !sig) return false;
   if (!isAllowedHttpsUrl(targetUrl) || !isAllowedHttpsUrl(referer)) return false;
@@ -74,8 +88,27 @@ export function verifySignedManifestParams(
     return false;
   }
 
-  const expected = signPayload(targetUrl, referer, exp);
+  const expected = signPayload(targetUrl, referer, exp, extra);
   return safeEqual(sig, expected);
+}
+
+/** Construye una URL proxy firmada en nuestro dominio para servir playlists .m3u8 con CORS `*`. */
+export function buildSignedManifestProxyUrl(
+  targetUrl: string,
+  referer: string,
+  ttlSeconds = 21600
+): string {
+  return buildSignedProxyUrl('/api/earnvids/manifest', targetUrl, referer, ttlSeconds);
+}
+
+/** Verifica firma HMAC, vigencia temporal y protocolo seguro antes de hacer fetch. */
+export function verifySignedManifestParams(
+  targetUrl: string,
+  referer: string,
+  expStr: string,
+  sig: string
+): boolean {
+  return verifySignedProxyParams(targetUrl, referer, expStr, sig);
 }
 
 /**
