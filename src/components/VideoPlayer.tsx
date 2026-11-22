@@ -33,6 +33,55 @@ interface VidaraStreamInfo {
   fallback_embed: string;
 }
 
+const DIRECT_EXTRACTORS: Record<
+  'vidara' | 'streamwish' | 'uqload' | 'earnvids' | 'streamtape' | 'vidsonic',
+  {
+    endpoint: string;
+    getFilecode: (video: NormalizedVideoLink) => string | null;
+    sendUrl?: boolean;
+  }
+> = {
+  vidara: {
+    endpoint: '/api/vidara',
+    getFilecode: (v) => v.vidaraFilecode,
+    sendUrl: false,
+  },
+  streamwish: {
+    endpoint: '/api/streamwish',
+    getFilecode: (v) => v.streamwishFilecode,
+    sendUrl: true,
+  },
+  uqload: {
+    endpoint: '/api/uqload',
+    getFilecode: (v) => v.uqloadFilecode,
+    sendUrl: true,
+  },
+  earnvids: {
+    endpoint: '/api/earnvids',
+    getFilecode: (v) => v.earnvidsFilecode,
+    sendUrl: true,
+  },
+  streamtape: {
+    endpoint: '/api/streamtape',
+    getFilecode: (v) => v.streamtapeFilecode,
+    sendUrl: true,
+  },
+  vidsonic: {
+    endpoint: '/api/vidsonic',
+    getFilecode: (v) => v.vidsonicFilecode,
+    sendUrl: true,
+  },
+};
+
+function getDirectExtractorConfig(video: NormalizedVideoLink | null) {
+  if (!video) return null;
+  if (!(video.playerType in DIRECT_EXTRACTORS)) return null;
+  const cfg =
+    DIRECT_EXTRACTORS[video.playerType as keyof typeof DIRECT_EXTRACTORS];
+  const filecode = cfg.getFilecode(video);
+  return filecode ? { ...cfg, filecode } : null;
+}
+
 const LANGUAGE_ORDER: { code: LanguageCode; label: string; flag: string }[] = [
   { code: 'LAT', label: 'Español Latino', flag: '🇲🇽' },
   { code: 'CAST', label: 'Castellano', flag: '🇪🇸' },
@@ -128,26 +177,13 @@ export default function VideoPlayer({
     );
   }, [currentLangVideos, selectedVideoId]);
 
-  // Resolve Vidara, StreamWish, Uqload, EarnVids or Streamtape direct streaming_url and thumbnail
+  // Resolve direct streaming_url and thumbnail when activeVideo uses a built-in extractor
   useEffect(() => {
-    const isVidara =
-      activeVideo?.playerType === 'vidara' && Boolean(activeVideo?.vidaraFilecode);
-    const isStreamWish =
-      activeVideo?.playerType === 'streamwish' &&
-      Boolean(activeVideo?.streamwishFilecode);
-    const isUqload =
-      activeVideo?.playerType === 'uqload' &&
-      Boolean(activeVideo?.uqloadFilecode);
-    const isEarnVids =
-      activeVideo?.playerType === 'earnvids' &&
-      Boolean(activeVideo?.earnvidsFilecode);
-    const isStreamtape =
-      activeVideo?.playerType === 'streamtape' &&
-      Boolean(activeVideo?.streamtapeFilecode);
+    const extractor = getDirectExtractorConfig(activeVideo);
 
     if (
       !activeVideo ||
-      (!isVidara && !isStreamWish && !isUqload && !isEarnVids && !isStreamtape) ||
+      !extractor ||
       (activeVideo.requiresAuth && !isAuthenticated)
     ) {
       setVidaraInfo(null);
@@ -161,31 +197,13 @@ export default function VideoPlayer({
     setVidaraStarted(false);
     setVidaraInfo(null);
 
-    const endpoint = isVidara
-      ? '/api/vidara'
-      : isStreamWish
-      ? '/api/streamwish'
-      : isUqload
-      ? '/api/uqload'
-      : isEarnVids
-      ? '/api/earnvids'
-      : '/api/streamtape';
-    const filecode =
-      (isVidara
-        ? activeVideo.vidaraFilecode
-        : isStreamWish
-        ? activeVideo.streamwishFilecode
-        : isUqload
-        ? activeVideo.uqloadFilecode
-        : isEarnVids
-        ? activeVideo.earnvidsFilecode
-        : activeVideo.streamtapeFilecode) || '';
-    const payload = isVidara
-      ? { filecode }
-      : {
+    const { endpoint, filecode, sendUrl } = extractor;
+    const payload = sendUrl
+      ? {
           filecode,
           url: activeVideo.playbackUrl,
-        };
+        }
+      : { filecode };
 
     fetch(endpoint, {
       method: 'POST',
@@ -237,18 +255,14 @@ export default function VideoPlayer({
     };
   }, [activeVideo, iframeKey, isAuthenticated]);
 
-  // Determine effective HLS URL (standard HLS server OR Vidara / StreamWish / Uqload direct m3u8 once user clicks Play)
+  // Determine effective HLS URL (standard HLS server OR extracted direct m3u8 once user clicks Play)
   const effectiveHlsUrl = useMemo(() => {
     if (!activeVideo) return null;
     if (activeVideo.playerType === 'hls') {
       return activeVideo.playbackUrl;
     }
     if (
-      (activeVideo.playerType === 'vidara' ||
-        activeVideo.playerType === 'streamwish' ||
-        activeVideo.playerType === 'uqload' ||
-        activeVideo.playerType === 'earnvids' ||
-        activeVideo.playerType === 'streamtape') &&
+      activeVideo.playerType in DIRECT_EXTRACTORS &&
       vidaraStarted &&
       vidaraInfo?.streaming_url &&
       vidaraInfo.streaming_url.toLowerCase().includes('.m3u8')
@@ -506,11 +520,7 @@ export default function VideoPlayer({
                     <Lock className="w-2.5 h-2.5 text-amber-500" />
                   )}
                   <span>
-                    {video.playerType === 'vidara' ||
-                    video.playerType === 'streamwish' ||
-                    video.playerType === 'uqload' ||
-                    video.playerType === 'earnvids' ||
-                    video.playerType === 'streamtape'
+                    {video.playerType in DIRECT_EXTRACTORS
                       ? 'DIRECTO'
                       : video.playerType === 'hls'
                       ? 'HLS'
@@ -594,12 +604,8 @@ export default function VideoPlayer({
             </div>
           ) : (
             <>
-              {/* Mode 0: Vidara, StreamWish, Uqload, EarnVids & Streamtape Direct Stream with Pre-Play Thumbnail Cover */}
-            {(activeVideo.playerType === 'vidara' ||
-              activeVideo.playerType === 'streamwish' ||
-              activeVideo.playerType === 'uqload' ||
-              activeVideo.playerType === 'earnvids' ||
-              activeVideo.playerType === 'streamtape') && (
+              {/* Mode 0: Built-in Direct Extractors with Pre-Play Thumbnail Cover */}
+            {activeVideo.playerType in DIRECT_EXTRACTORS && (
               <>
                 {vidaraLoading ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 gap-3">
@@ -741,11 +747,7 @@ export default function VideoPlayer({
               Reproduciendo en{' '}
               <strong className="text-zinc-200">{activeVideo.serverLabel}</strong> (
               {activeVideo.langFlag} {activeVideo.langLabel})
-              {(activeVideo.playerType === 'vidara' ||
-                activeVideo.playerType === 'streamwish' ||
-                activeVideo.playerType === 'uqload' ||
-                activeVideo.playerType === 'earnvids' ||
-                activeVideo.playerType === 'streamtape') &&
+              {activeVideo.playerType in DIRECT_EXTRACTORS &&
                 vidaraInfo?.streaming_url && (
                   <span className="ml-2 text-emerald-400 font-semibold">
                     {vidaraInfo.streaming_url.toLowerCase().includes('.m3u8')

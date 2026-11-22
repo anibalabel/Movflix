@@ -26,6 +26,7 @@ export interface NormalizedVideoLink extends RawVideoLink {
     | 'uqload'
     | 'earnvids'
     | 'streamtape'
+    | 'vidsonic'
     | 'hls'
     | 'mp4'
     | 'youtube'
@@ -36,6 +37,7 @@ export interface NormalizedVideoLink extends RawVideoLink {
   uqloadFilecode: string | null;
   earnvidsFilecode: string | null;
   streamtapeFilecode: string | null;
+  vidsonicFilecode: string | null;
   requiresAuth: boolean;
 }
 
@@ -443,6 +445,43 @@ export function extractStreamtapeFilecode(
 }
 
 /**
+ * Extrae el filecode de Vidsonic (ej. https://vidsonic.net/e/abc123 o https://vidsonic.org/embed-abc123.html)
+ */
+export function extractVidsonicFilecode(
+  link: string,
+  rawServer?: string | null,
+  rawHeader?: string | null
+): string | null {
+  const trimmed = (link || '').trim();
+  if (!trimmed) return null;
+
+  const combined = `${rawHeader || ''} ${rawServer || ''} ${trimmed}`.toLowerCase();
+  if (!combined.includes('vidsonic')) {
+    return null;
+  }
+
+  const pathMatch = trimmed.match(
+    /(?:embed-|\/(?:e|v|d|embed)\/)([a-zA-Z0-9_-]+)(?:\.html)?/i
+  );
+  if (pathMatch?.[1] && pathMatch[1].toLowerCase() !== 'embed') {
+    return pathMatch[1];
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    const last = segments[segments.length - 1]?.replace(/\.html$/i, '');
+    if (last && last.toLowerCase() !== 'embed' && last.toLowerCase() !== 'e') {
+      return last;
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
+/**
  * Normaliza enlaces de servidores embed como Vidara que en la BD vienen con `/v/`
  * (ej. https://vidara.so/v/qo1LOLLEEEw3i -> https://vidara.so/e/qo1LOLLEEEw3i)
  */
@@ -468,6 +507,11 @@ export function normalizeEmbedPlaybackUrl(
   const uqCode = extractUqloadFilecode(link, rawServer, rawHeader);
   if (uqCode) {
     return `https://uqload.vc/e/${uqCode}`;
+  }
+
+  // Migrar enlaces antiguos de vidsonic.org al dominio activo vidsonic.net
+  if (link.toLowerCase().includes('vidsonic.org')) {
+    return link.replace(/vidsonic\.org/gi, 'vidsonic.net');
   }
 
   return link;
@@ -497,6 +541,11 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     video.server,
     video.header
   );
+  const vidsonicFilecode = extractVidsonicFilecode(
+    rawLink,
+    video.server,
+    video.header
+  );
 
   const isHlsFlag = Number(video.hls) === 1;
   const isYoutubeFlag = Number(video.youtubelink) === 1;
@@ -521,6 +570,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     | 'uqload'
     | 'earnvids'
     | 'streamtape'
+    | 'vidsonic'
     | 'hls'
     | 'mp4'
     | 'youtube'
@@ -528,7 +578,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
   let playbackUrl = link;
 
   // Regla principal de `supported_hosts`:
-  // Solo si `supported_hosts == 1` está activo intentamos usar los extractores propios implementados (Vidara, StreamWish, Uqload, EarnVids y Streamtape).
+  // Solo si `supported_hosts == 1` está activo intentamos usar los extractores propios implementados.
   if (isSupportedHostFlag) {
     if (vidaraFilecode) {
       playerType = 'vidara';
@@ -544,6 +594,11 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     } else if (streamtapeFilecode) {
       playerType = 'streamtape';
       playbackUrl = `https://streamtape.com/e/${streamtapeFilecode}`;
+    } else if (vidsonicFilecode) {
+      playerType = 'vidsonic';
+      playbackUrl = link.startsWith('http')
+        ? link
+        : `https://vidsonic.net/e/${vidsonicFilecode}`;
     } else {
       playerType = 'embed';
     }
@@ -583,6 +638,7 @@ export function classifyVideoLink(video: RawVideoLink): NormalizedVideoLink {
     uqloadFilecode,
     earnvidsFilecode,
     streamtapeFilecode,
+    vidsonicFilecode,
     // Los videos con `supported_hosts == 1` requieren que el usuario esté registrado y logueado
     requiresAuth: isSupportedHostFlag,
   };
