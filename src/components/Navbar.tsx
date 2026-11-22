@@ -80,18 +80,12 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Brand Logo */}
           <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center shadow-lg shadow-red-600/30 group-hover:scale-105 transition">
-                <span className="text-white font-black text-lg tracking-tighter">M</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-lg font-extrabold tracking-tight text-white leading-none">
-                  MOV<span className="text-red-500">FLIX</span>
-                </span>
-                <span className="text-[10px] text-zinc-400 font-medium tracking-widest uppercase">
-                  Streaming HD
-                </span>
-              </div>
+            <Link href="/" className="flex items-center group shrink-0">
+              <img
+                src="/logo.png"
+                alt="MovFlix"
+                className="h-11 sm:h-12 w-auto object-contain group-hover:scale-105 transition drop-shadow-md"
+              />
             </Link>
 
             {/* Desktop Navigation */}

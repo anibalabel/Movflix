@@ -179,14 +179,13 @@ export default function AppsDownloadPage() {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(220,38,38,0.22),transparent_60%)]" />
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center text-white font-black text-xs">
-                      M
-                    </div>
-                    <span className="text-xs font-extrabold tracking-wider text-white">
-                      MOV<span className="text-red-500">FLIX</span>{' '}
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 ml-1">
-                        ANDROID TV
-                      </span>
+                    <img
+                      src="/logo.png"
+                      alt="MovFlix"
+                      className="h-7 w-auto object-contain"
+                    />
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      ANDROID TV
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-medium">
