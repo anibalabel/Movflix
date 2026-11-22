@@ -11,7 +11,7 @@ import crypto from 'crypto';
 import { Connection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
 export const WEB_GOOGLE_REDIRECT_URI =
-  process.env.GOOGLE_REDIRECT_URI || 'https://docines.us/auth/google/callback';
+  process.env.GOOGLE_REDIRECT_URI || 'https://movflix.live/auth/google/callback';
 
 export interface GoogleSettings {
   google_client_id: string;
@@ -302,7 +302,7 @@ export async function GET(request: NextRequest) {
         const callbackUrl =
           request.nextUrl.searchParams.get('redirect_uri') ||
           settings.google_redirect_uri ||
-          'https://docines.us/auth/google/callback';
+          'https://movflix.live/auth/google/callback';
         const syncAvatar = request.nextUrl.searchParams.get('sync_avatar') === '1';
         const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
         authUrl.searchParams.set('client_id', settings.google_client_id);
