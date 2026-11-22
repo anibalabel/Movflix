@@ -226,7 +226,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-1.5 px-2">
                   {data.hero.map((item, idx) => (
                     <button
-                      key={`${item.mediaType}-${item.id}`}
+                      key={`${item.mediaType}-${item.id}-${idx}`}
                       type="button"
                       onClick={() => setHeroIndex(idx)}
                       className={`h-2 rounded-full transition-all cursor-pointer ${

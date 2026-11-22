@@ -102,20 +102,28 @@ export async function GET() {
         return 'movies';
       };
 
-      const heroItems = featuredRows.map((f) => ({
-        id: Number(f.featured_id),
-        featured_row_id: Number(f.id),
-        title: f.title || 'Sin título',
-        overview: f.overview || '',
-        poster_path: normalizeImageUrl(f.poster_path, 'w500'),
-        backdrop_path: normalizeImageUrl(f.backdrop_path_tv || f.backdrop_path, 'original'),
-        vote_average: Number(f.vote_average || 0),
-        release_date: f.release_date || null,
-        quality: f.quality || null,
-        genre: f.genre || null,
-        position: Number(f.position || 0),
-        mediaType: mapFeaturedType(f.type),
-      }));
+      const seenHero = new Set<string>();
+      const heroItems = featuredRows
+        .map((f) => ({
+          id: Number(f.featured_id),
+          featured_row_id: Number(f.id),
+          title: f.title || 'Sin título',
+          overview: f.overview || '',
+          poster_path: normalizeImageUrl(f.poster_path, 'w500'),
+          backdrop_path: normalizeImageUrl(f.backdrop_path_tv || f.backdrop_path, 'original'),
+          vote_average: Number(f.vote_average || 0),
+          release_date: f.release_date || null,
+          quality: f.quality || null,
+          genre: f.genre || null,
+          position: Number(f.position || 0),
+          mediaType: mapFeaturedType(f.type),
+        }))
+        .filter((item) => {
+          const key = `${item.mediaType}-${item.id}`;
+          if (seenHero.has(key)) return false;
+          seenHero.add(key);
+          return true;
+        });
 
       return NextResponse.json({
         success: true,
