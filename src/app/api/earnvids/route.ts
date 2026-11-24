@@ -169,7 +169,7 @@ async function fetchEarnVidsFromUrl(embedUrl: string): Promise<{
   };
 }
 
-export async function resolveEarnVidsUrl(
+async function resolveEarnVidsUrl(
   targetUrl?: string,
   rawFilecode?: string
 ) {

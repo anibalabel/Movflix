@@ -86,7 +86,7 @@ async function fetchUqloadPage(url: string, omitReferer = false) {
   return { streamingUrl, thumbnail };
 }
 
-export async function resolveUqloadUrl(
+async function resolveUqloadUrl(
   targetUrl?: string,
   rawFilecode?: string
 ) {
