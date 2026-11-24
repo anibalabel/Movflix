@@ -7,6 +7,52 @@ import {
   upsertGoogleUser,
 } from '@/app/api/auth/google/route';
 
+function isLocalHostname(host: string): boolean {
+  const hostname = host.split(':')[0].trim().toLowerCase();
+  return (
+    !hostname ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1'
+  );
+}
+
+/** Resuelve el origen público real detrás de proxies (LiteSpeed/Passenger) sin caer en localhost:3000. */
+function getPublicOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers
+    .get('x-forwarded-host')
+    ?.split(',')[0]
+    ?.trim();
+  const hostHeader = request.headers.get('host')?.split(',')[0]?.trim();
+  const publicHost =
+    (forwardedHost && !isLocalHostname(forwardedHost) ? forwardedHost : null) ||
+    (hostHeader && !isLocalHostname(hostHeader) ? hostHeader : null);
+
+  if (publicHost) {
+    const forwardedProto = request.headers
+      .get('x-forwarded-proto')
+      ?.split(',')[0]
+      ?.trim();
+    const proto = forwardedProto === 'http' ? 'http' : 'https';
+    return `${proto}://${publicHost}`;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      return new URL(WEB_GOOGLE_REDIRECT_URI).origin;
+    } catch {
+      return 'https://movflix.live';
+    }
+  }
+
+  const localHost = forwardedHost || hostHeader;
+  if (localHost) {
+    return `http://${localHost}`;
+  }
+
+  return new URL(request.url).origin;
+}
+
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
   const accessTokenParam = request.nextUrl.searchParams.get('access_token');
@@ -22,7 +68,7 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/', getPublicOrigin(request)));
   }
 
   try {
@@ -85,7 +131,9 @@ export async function GET(request: NextRequest) {
         return jsonRes;
       }
 
-      const redirectRes = NextResponse.redirect(new URL('/dashboard', request.url));
+      const redirectRes = NextResponse.redirect(
+        new URL('/dashboard', getPublicOrigin(request))
+      );
       redirectRes.cookies.set('dooplex_session', cookiePayload, {
         httpOnly: true,
         path: '/',
@@ -108,7 +156,7 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/', getPublicOrigin(request)));
   }
 }
 
