@@ -11,3 +11,5 @@ out
 apiweb/db_dooplex/config.local.php
 DOOPOLEX_DB_Y_WEB_SPEC.md 
 AGENTS.md 
+.vscode
+!.vscode/sftp.json
